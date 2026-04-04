@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import socket from '../services/socket';
 import { getAllDoctors, joinQueue, getQueueStatus, cancelQueue, getQueueHistory, getMyReports } from '../services/api';
 
 const PatientDashboard = () => {
@@ -19,10 +20,30 @@ const PatientDashboard = () => {
     notes: ''
   });
 
-  useEffect(() => {
-    fetchDoctors();
+ useEffect(() => {
+  fetchDoctors();
+  fetchQueueStatus();
+
+  // Socket.io — real-time updates
+  socket.on('queueUpdated', (data) => {
     fetchQueueStatus();
-  }, []);
+    setMessage(`🔔 Token ${data.tokenNumber} called! Please be ready!`);
+  });
+
+  socket.on('queueCompleted', (data) => {
+    fetchQueueStatus();
+  });
+
+  socket.on('queueCancelled', (data) => {
+    fetchQueueStatus();
+  });
+
+  return () => {
+    socket.off('queueUpdated');
+    socket.off('queueCompleted');
+    socket.off('queueCancelled');
+  };
+}, []);
 
   const fetchDoctors = async () => {
     try {
