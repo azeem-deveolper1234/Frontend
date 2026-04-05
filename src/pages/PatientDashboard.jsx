@@ -20,9 +20,14 @@ const PatientDashboard = () => {
     notes: ''
   });
 
- useEffect(() => {
+useEffect(() => {
   fetchDoctors();
   fetchQueueStatus();
+
+  // Har 10 second mein automatically refresh
+  const interval = setInterval(() => {
+    fetchQueueStatus();
+  }, 10000);
 
   // Socket.io — real-time updates
   socket.on('queueUpdated', (data) => {
@@ -39,11 +44,14 @@ const PatientDashboard = () => {
   });
 
   return () => {
+    clearInterval(interval);
     socket.off('queueUpdated');
     socket.off('queueCompleted');
     socket.off('queueCancelled');
   };
 }, []);
+
+ 
 
   const fetchDoctors = async () => {
     try {
