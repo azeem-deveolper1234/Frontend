@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import socket from '../services/socket';
-import { getAllDoctors, joinQueue, getQueueStatus, cancelQueue, getQueueHistory, getMyReports } from '../services/api';
+import { getAllDoctors, joinQueue, getQueueStatus, cancelQueue, getQueueHistory, getMyReports ,createPayment, getPaymentHistory} from '../services/api';
 
 const PatientDashboard = () => {
   const { user, logoutUser } = useAuth();
@@ -19,6 +19,13 @@ const PatientDashboard = () => {
     appointmentDate: '',
     notes: ''
   });
+const [payments, setPayments] = useState([]);
+const [paymentForm, setPaymentForm] = useState({
+  queueId: '',
+  doctorId: '',
+  totalAmount: '',
+  paymentMethod: 'cash'
+});
 
 useEffect(() => {
   fetchDoctors();
@@ -76,6 +83,13 @@ useEffect(() => {
     } catch (err) {}
   };
 
+  const fetchPayments = async () => {
+  try {
+    const res = await getPaymentHistory();
+    setPayments(res.data.payments);
+  } catch (err) {}
+};
+
   const fetchReports = async () => {
     try {
       const res = await getMyReports();
@@ -109,13 +123,14 @@ useEffect(() => {
     }
   };
 
-  const handleTabChange = (tab) => {
-    setActiveTab(tab);
-    setMessage('');
-    setError('');
-    if (tab === 'history') fetchHistory();
-    if (tab === 'reports') fetchReports();
-  };
+ const handleTabChange = (tab) => {
+  setActiveTab(tab);
+  setMessage('');
+  setError('');
+  if (tab === 'history') fetchHistory();
+  if (tab === 'reports') fetchReports();
+  if (tab === 'payments') fetchPayments();
+};
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -152,6 +167,7 @@ useEffect(() => {
               { id: 'status', label: '⏳ Queue Status' },
               { id: 'history', label: '📅 History' },
               { id: 'reports', label: '🏥 Medical Reports' },
+              { id: 'payments', label: '💰 Payments' },
             ].map(tab => (
               <button
                 key={tab.id}
@@ -465,8 +481,7 @@ useEffect(() => {
                     <div className="flex justify-between items-start mb-4">
                       <div>
                         <h4 className="font-bold text-gray-800 text-lg">{report.diagnosis}</h4>
-                        <p className="text-blue-600 text-sm">Dr. {report.doctor?.name}</p>
-                        <p className="text-gray-500 text-xs mt-1">{new Date(report.createdAt).toLocaleDateString()}</p>
+        <p className="text-blue-600 text-sm">{report.doctor?.name}</p><p className="text-gray-500 text-xs mt-1">{new Date(report.createdAt).toLocaleDateString()}</p>
                       </div>
                       {report.followUp && (
                         <span className="bg-orange-100 text-orange-700 text-xs px-3 py-1 rounded-full font-semibold">
@@ -506,6 +521,112 @@ useEffect(() => {
                         📅 Next Appointment: {new Date(report.nextAppointment).toLocaleDateString()}
                       </div>
                     )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+{/* PAYMENTS TAB */}
+        {activeTab === 'payments' && (
+          <div className="max-w-lg mx-auto">
+            <h2 className="text-2xl font-bold text-gray-800 mb-6">My Payments</h2>
+
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
+              <h3 className="font-bold text-gray-800 text-lg mb-4">Make Advance Payment</h3>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Total Amount (Rs.)</label>
+                  <input
+                    type="number"
+                    value={paymentForm.totalAmount}
+                    onChange={(e) => setPaymentForm({ ...paymentForm, totalAmount: e.target.value })}
+                    placeholder="1000"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Payment Method</label>
+                  <select
+                    value={paymentForm.paymentMethod}
+                    onChange={(e) => setPaymentForm({ ...paymentForm, paymentMethod: e.target.value })}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+                  >
+                    <option value="cash">Cash</option>
+                    <option value="card">Card</option>
+                    <option value="online">Online (JazzCash/EasyPaisa)</option>
+                  </select>
+                </div>
+                <div className="bg-blue-50 rounded-xl p-4">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Total Amount:</span>
+                    <span className="font-semibold">Rs. {paymentForm.totalAmount || 0}</span>
+                  </div>
+                  <div className="flex justify-between text-sm mt-1">
+                    <span className="text-gray-600">Advance (50%):</span>
+                    <span className="font-semibold text-green-600">Rs. {paymentForm.totalAmount ? paymentForm.totalAmount / 2 : 0}</span>
+                  </div>
+                  <div className="flex justify-between text-sm mt-1">
+                    <span className="text-gray-600">Remaining (at clinic):</span>
+                    <span className="font-semibold text-orange-500">Rs. {paymentForm.totalAmount ? paymentForm.totalAmount / 2 : 0}</span>
+                  </div>
+                </div>
+                <button
+                  onClick={async () => {
+                    if (!queueStatus) return setError('Pehle queue join karo!');
+                    setLoading(true);
+                    try {
+                      await createPayment({
+                        queueId: queueStatus._id || '',
+                        doctorId: doctors[0]?._id || '',
+                        totalAmount: parseInt(paymentForm.totalAmount),
+                        paymentMethod: paymentForm.paymentMethod
+                      });
+                      setMessage('✅ Advance payment successful!');
+                      fetchPayments();
+                    } catch (err) {
+                      setError(err.response?.data?.message || 'Payment failed');
+                    }
+                    setLoading(false);
+                  }}
+                  disabled={loading || !paymentForm.totalAmount}
+                  className="w-full bg-gradient-to-r from-green-600 to-green-400 text-white py-3 rounded-lg font-semibold text-lg hover:from-green-700 hover:to-green-500 transition disabled:opacity-50"
+                >
+                  {loading ? '⏳ Processing...' : '💳 Pay Advance (50%)'}
+                </button>
+              </div>
+            </div>
+
+            <h3 className="font-bold text-gray-800 text-lg mb-4">Payment History</h3>
+            {payments.length === 0 ? (
+              <div className="text-center py-8 bg-white rounded-2xl">
+                <div className="text-4xl mb-2">💰</div>
+                <p className="text-gray-500">No payments yet</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {payments.map((payment, index) => (
+                  <div key={index} className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h4 className="font-bold text-gray-800">{payment.doctor?.name}</h4>
+                        <p className="text-gray-500 text-sm mt-1">{new Date(payment.createdAt).toLocaleDateString()}</p>
+                        <p className="text-gray-500 text-sm">Method: {payment.paymentMethod}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-bold text-gray-800">Rs. {payment.totalAmount}</p>
+                        <p className="text-green-600 text-sm">Paid: Rs. {payment.advanceAmount}</p>
+                        <p className="text-orange-500 text-sm">Due: Rs. {payment.remainingAmount}</p>
+                        <span className={`text-xs px-3 py-1 rounded-full font-semibold mt-1 inline-block ${
+                          payment.advanceStatus === 'paid' ? 'bg-green-100 text-green-700' :
+                          payment.advanceStatus === 'cancelled' ? 'bg-red-100 text-red-700' :
+                          'bg-yellow-100 text-yellow-700'
+                        }`}>
+                          {payment.advanceStatus}
+                        </span>
+                      </div>
+                    </div>
                   </div>
                 ))}
               </div>
