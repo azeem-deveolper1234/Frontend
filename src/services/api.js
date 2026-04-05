@@ -40,5 +40,9 @@ export const completeQueue = (data) => API.post('/queue/complete', data);
 export const getAnalyticsToday = () => API.get('/analytics/today');
 export const getAnalyticsOverall = () => API.get('/analytics/overall');
 export const getAllPayments = () => API.get('/payments/all');
-
+// ADMIN
+export const createMedicalReport = (data) => API.post('/medical-reports/create', data);
+export const getPatientReports = (patientId) => API.get(`/medical-reports/patient/${patientId}`);
+export const getAllUsers = () => API.get('/auth/users');
+export const getPatientQueue = (userId) => API.get(`/queue/patient/${userId}`);
 export default API;
