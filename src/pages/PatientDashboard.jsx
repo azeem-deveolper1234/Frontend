@@ -31,24 +31,36 @@ useEffect(() => {
   fetchDoctors();
   fetchQueueStatus();
 
-  // Har 10 second mein automatically refresh
+  // Har 30 second mein automatically refresh
   const interval = setInterval(() => {
     fetchQueueStatus();
-  }, 10000);
+  }, 30000);
 
   // Socket.io — real-time updates
   socket.on('queueUpdated', (data) => {
     fetchQueueStatus();
     setMessage(`🔔 Token ${data.tokenNumber} called! Please be ready!`);
+    // Browser notification
+    if (Notification.permission === 'granted') {
+      new Notification('City Medical Clinic', {
+        body: `Token ${data.tokenNumber} called! Please be ready!`,
+        icon: '🏥'
+      });
+    }
   });
 
-  socket.on('queueCompleted', (data) => {
+  socket.on('queueCompleted', () => {
     fetchQueueStatus();
   });
 
-  socket.on('queueCancelled', (data) => {
+  socket.on('queueCancelled', () => {
     fetchQueueStatus();
   });
+
+  // Browser notification permission
+  if (Notification.permission === 'default') {
+    Notification.requestPermission();
+  }
 
   return () => {
     clearInterval(interval);
