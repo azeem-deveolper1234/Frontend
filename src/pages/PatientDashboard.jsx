@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import AppointmentReceipt from '../components/AppointmentReceipt';
 import { useAuth } from '../context/AuthContext';
 import socket from '../services/socket';
 import { getAllDoctors, joinQueue, getQueueStatus, cancelQueue, getQueueHistory, getMyReports ,createPayment, getPaymentHistory} from '../services/api';
@@ -13,12 +14,16 @@ const PatientDashboard = () => {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
-  const [joinForm, setJoinForm] = useState({
-    serviceName: '',
-    priority: 'normal',
-    appointmentDate: '',
-    notes: ''
-  });
+  const [showReceipt, setShowReceipt] = useState(false);
+const [receiptData, setReceiptData] = useState(null);
+const [joinForm, setJoinForm] = useState({
+  serviceName: '',
+  priority: 'normal',
+  appointmentDate: '',
+  notes: '',
+  totalAmount: '',
+  paymentMethod: 'cash'
+});
 const [payments, setPayments] = useState([]);
 const [paymentForm, setPaymentForm] = useState({
   queueId: '',
@@ -63,6 +68,8 @@ useEffect(() => {
   }
 
   return () => {
+
+    
     clearInterval(interval);
     socket.off('queueUpdated');
     socket.off('queueCompleted');
@@ -108,22 +115,63 @@ useEffect(() => {
       setReports(res.data.reports);
     } catch (err) {}
   };
+const handleJoinQueue = async (e) => {
+  e.preventDefault();
+  setLoading(true);
+  setError('');
+  setMessage('');
+  try {
+    // Step 1: Queue join karo
+    const queueRes = await joinQueue({
+      serviceName: joinForm.serviceName,
+      priority: joinForm.priority,
+      appointmentDate: joinForm.appointmentDate,
+      notes: joinForm.notes
+    });
 
-  const handleJoinQueue = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setError('');
-    setMessage('');
-    try {
-      const res = await joinQueue(joinForm);
-      setMessage(`✅ Queue joined! Your token: ${res.data.tokenNumber}`);
-      fetchQueueStatus();
-    } catch (err) {
-      setError(err.response?.data?.message || 'Failed to join queue');
+    const newQueueId = queueRes.data._id;
+    const doctorObj = doctors.find(d => d.name === joinForm.serviceName);
+
+    // Step 2: Payment karo
+    if (joinForm.totalAmount && newQueueId && doctorObj) {
+      await createPayment({
+        queueId: newQueueId,
+        doctorId: doctorObj._id,
+        totalAmount: parseInt(joinForm.totalAmount),
+        paymentMethod: joinForm.paymentMethod
+      });
     }
-    setLoading(false);
-  };
 
+    // Step 3: Receipt dikhao
+    setReceiptData({
+      tokenNumber: queueRes.data.tokenNumber,
+      patientName: user.name,
+      email: user.email,
+      phone: user.phone || '',
+      doctorName: joinForm.serviceName,
+      appointmentDate: joinForm.appointmentDate,
+      priority: joinForm.priority,
+      notes: joinForm.notes,
+      totalAmount: joinForm.totalAmount ? parseInt(joinForm.totalAmount) : null
+    });
+    setShowReceipt(true);
+
+    fetchQueueStatus();
+    setActiveTab('home');
+    setJoinForm({
+      serviceName: '',
+      priority: 'normal',
+      appointmentDate: '',
+      notes: '',
+      totalAmount: '',
+      paymentMethod: 'cash'
+    });
+
+  } catch (err) {
+    setError(err.response?.data?.message || 'Booking failed');
+  }
+  setLoading(false);
+};
   const handleCancelQueue = async () => {
     if (!window.confirm('Are you sure you want to cancel?')) return;
     try {
@@ -145,8 +193,15 @@ useEffect(() => {
 };
 
   return (
+
     <div className="min-h-screen bg-gray-50">
 
+{showReceipt && receiptData && (
+  <AppointmentReceipt
+    data={receiptData}
+    onClose={() => setShowReceipt(false)}
+  />
+)}
       {/* Navbar */}
       <nav className="bg-gradient-to-r from-blue-800 to-blue-600 shadow-lg">
         <div className="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
@@ -179,7 +234,7 @@ useEffect(() => {
               { id: 'status', label: '⏳ Queue Status' },
               { id: 'history', label: '📅 History' },
               { id: 'reports', label: '🏥 Medical Reports' },
-              { id: 'payments', label: '💰 Payments' },
+              
             ].map(tab => (
               <button
                 key={tab.id}
@@ -294,20 +349,27 @@ useEffect(() => {
               <p className="text-gray-500 text-sm mb-6">Fill in the details to join the queue</p>
 
               <form onSubmit={handleJoinQueue} className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Select Doctor</label>
-                  <select
-                    value={joinForm.serviceName}
-                    onChange={(e) => setJoinForm({ ...joinForm, serviceName: e.target.value })}
-                    required
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
-                  >
-                    <option value="">-- Select Doctor --</option>
-                    {doctors.map(doc => (
-                      <option key={doc._id} value={doc.name}>{doc.name} — {doc.specialization}</option>
-                    ))}
-                  </select>
-                </div>
+              <div>
+  <label className="block text-sm font-medium text-gray-700 mb-1">Select Doctor</label>
+  <select
+    value={joinForm.serviceName}
+    onChange={(e) => {
+      const selectedDoctor = doctors.find(d => d.name === e.target.value);
+      setJoinForm({ 
+        ...joinForm, 
+        serviceName: e.target.value,
+        totalAmount: selectedDoctor ? selectedDoctor.consultationFee : ''
+      });
+    }}
+    required
+    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+  >
+    <option value="">-- Select Doctor --</option>
+    {doctors.map(doc => (
+      <option key={doc._id} value={doc.name}>{doc.name} — {doc.specialization}</option>
+    ))}
+  </select>
+</div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Appointment Date</label>
@@ -344,6 +406,53 @@ useEffect(() => {
                   />
                 </div>
 
+
+{/* Payment Section */}
+<div className="border-t border-gray-200 pt-4 mt-4">
+  <h3 className="font-semibold text-gray-800 mb-3">💳 Advance Payment (50%)</h3>
+  
+  <div className="mb-3">
+    <label className="block text-sm font-medium text-gray-700 mb-1">Consultation Fee (Rs.)</label>
+    <input
+      type="number"
+      value={joinForm.totalAmount}
+      onChange={(e) => setJoinForm({ ...joinForm, totalAmount: e.target.value })}
+      placeholder="1000"
+      required
+      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+    />
+  </div>
+
+  <div className="mb-3">
+    <label className="block text-sm font-medium text-gray-700 mb-1">Payment Method</label>
+    <select
+      value={joinForm.paymentMethod}
+      onChange={(e) => setJoinForm({ ...joinForm, paymentMethod: e.target.value })}
+      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+    >
+      <option value="cash">Cash</option>
+      <option value="card">Card</option>
+      <option value="online">Online (JazzCash/EasyPaisa)</option>
+    </select>
+  </div>
+
+  {joinForm.totalAmount && (
+    <div className="bg-blue-50 rounded-xl p-4 mb-3">
+      <div className="flex justify-between text-sm">
+        <span className="text-gray-600">Total Fee:</span>
+        <span className="font-semibold">Rs. {joinForm.totalAmount}</span>
+      </div>
+      <div className="flex justify-between text-sm mt-1">
+        <span className="text-gray-600">Pay Now (50%):</span>
+        <span className="font-semibold text-green-600">Rs. {joinForm.totalAmount / 2}</span>
+      </div>
+      <div className="flex justify-between text-sm mt-1">
+        <span className="text-gray-600">Pay at Clinic (50%):</span>
+        <span className="font-semibold text-orange-500">Rs. {joinForm.totalAmount / 2}</span>
+      </div>
+    </div>
+  )}
+</div>
                 <button
                   type="submit"
                   disabled={loading}
@@ -550,13 +659,13 @@ useEffect(() => {
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Total Amount (Rs.)</label>
-                  <input
-                    type="number"
-                    value={paymentForm.totalAmount}
-                    onChange={(e) => setPaymentForm({ ...paymentForm, totalAmount: e.target.value })}
-                    placeholder="1000"
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
-                  />
+                 <input
+  type="number"
+  value={joinForm.totalAmount}
+  readOnly
+  placeholder="Doctor select karne pe fee aayegi"
+  className="w-full px-4 py-3 border border-gray-200 rounded-lg bg-gray-50 text-gray-700 cursor-not-allowed"
+/>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Payment Method</label>

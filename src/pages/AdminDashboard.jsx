@@ -1,7 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { callNextPatient, completeQueue, getAnalyticsToday, getAnalyticsOverall, getAllPayments, createMedicalReport, getAllUsers, getAllDoctors,getPatientQueue } from '../services/api';const AdminDashboard = () => {
-  
+import { 
+  callNextPatient, 
+  completeQueue, 
+  getAnalyticsToday, 
+  getAnalyticsOverall, 
+  getAllPayments, 
+  createMedicalReport, 
+  getAllUsers, 
+  getAllDoctors,
+  getPatientQueue,
+  getQueuePayment,        // ✅ add
+  completeFinalPayment    // ✅ add
+} from '../services/api';
+
+const AdminDashboard = () => {  
     const { user, logoutUser } = useAuth();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [todayStats, setTodayStats] = useState(null);
@@ -29,10 +42,11 @@ import { callNextPatient, completeQueue, getAnalyticsToday, getAnalyticsOverall,
     prescription: [{ medicineName: '', dosage: '', frequency: '', duration: '' }]
   });
 
-  useEffect(() => {
-    fetchTodayStats();
-    fetchOverallStats();
-  }, []);
+useEffect(() => {
+  fetchTodayStats();
+  fetchOverallStats();
+  fetchDoctors(); // 👈 add karo
+}, []);
 
   const fetchTodayStats = async () => {
     try {
@@ -98,6 +112,26 @@ import { callNextPatient, completeQueue, getAnalyticsToday, getAnalyticsOverall,
     }
     setLoading(false);
   };
+
+const handleFinalPayment = async (tokenNum) => {
+  try {
+    // Pehle queue dhundo
+    const queueRes = await getPatientQueue(tokenNum);
+    if (!queueRes.data) return setError('Queue nahi mili!');
+    
+    // Payment dhundo
+    const paymentRes = await getQueuePayment(queueRes.data._id);
+    if (!paymentRes.data) return setError('Payment record nahi mila!');
+    
+    // Final payment complete karo
+    await completeFinalPayment(paymentRes.data._id);
+    setMessage(`✅ Final payment complete! Token: ${tokenNum}`);
+    fetchPayments();
+  } catch (err) {
+    setError(err.response?.data?.message || 'Failed');
+  }
+};
+
 
   const handleCreateReport = async (e) => {
     e.preventDefault();
@@ -252,55 +286,82 @@ const handlePatientChange = async (patientId) => {
           </div>
         )}
 
-        {/* QUEUE MANAGER TAB */}
-        {activeTab === 'queue' && (
-          <div className="max-w-2xl mx-auto space-y-6">
-            <h2 className="text-2xl font-bold text-gray-800">Queue Manager</h2>
+{/* QUEUE MANAGER TAB */}
+{activeTab === 'queue' && (
+  <div className="max-w-2xl mx-auto space-y-6">
+    <h2 className="text-2xl font-bold text-gray-800">Queue Manager</h2>
 
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-              <label className="block text-sm font-medium text-gray-700 mb-2">Service Name</label>
-              <input
-                type="text"
-                value={serviceName}
-                onChange={(e) => setServiceName(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
-              />
-            </div>
+    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+      <label className="block text-sm font-medium text-gray-700 mb-2">Select Doctor</label>
+      <select
+        value={serviceName}
+        onChange={(e) => setServiceName(e.target.value)}
+        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+      >
+        <option value="">-- Select Doctor --</option>
+        {doctors.map(doc => (
+          <option key={doc._id} value={doc.name}>{doc.name} — {doc.specialization}</option>
+        ))}
+      </select>
+    </div>
 
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-              <h3 className="font-bold text-gray-800 text-lg mb-2">Call Next Patient</h3>
-              <p className="text-gray-500 text-sm mb-4">Emergency patients will be called first automatically</p>
-              <button
-                onClick={handleCallNext}
-                disabled={loading}
-                className="w-full bg-gradient-to-r from-blue-700 to-blue-500 text-white py-4 rounded-xl font-bold text-lg hover:from-blue-800 hover:to-blue-600 transition disabled:opacity-50"
-              >
-                {loading ? '⏳ Calling...' : '📢 Call Next Patient'}
-              </button>
-            </div>
+    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+      <h3 className="font-bold text-gray-800 text-lg mb-2">Call Next Patient</h3>
+      <p className="text-gray-500 text-sm mb-4">Emergency patients will be called first automatically</p>
+      <button
+        onClick={handleCallNext}
+        disabled={loading}
+        className="w-full bg-gradient-to-r from-blue-700 to-blue-500 text-white py-4 rounded-xl font-bold text-lg hover:from-blue-800 hover:to-blue-600 transition disabled:opacity-50"
+      >
+        {loading ? '⏳ Calling...' : '📢 Call Next Patient'}
+      </button>
+    </div>
 
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-              <h3 className="font-bold text-gray-800 text-lg mb-2">Complete Patient</h3>
-              <p className="text-gray-500 text-sm mb-4">Mark patient as served</p>
-              <div className="flex space-x-3">
-                <input
-                  type="number"
-                  value={tokenNumber}
-                  onChange={(e) => setTokenNumber(e.target.value)}
-                  placeholder="Token Number"
-                  className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 transition"
-                />
-                <button
-                  onClick={handleComplete}
-                  disabled={loading}
-                  className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-semibold transition disabled:opacity-50"
-                >
-                  ✅ Complete
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+      <h3 className="font-bold text-gray-800 text-lg mb-2">Complete Patient</h3>
+      <p className="text-gray-500 text-sm mb-4">Mark patient as served</p>
+      <div className="flex space-x-3">
+        <input
+          type="number"
+          value={tokenNumber}
+          onChange={(e) => setTokenNumber(e.target.value)}
+          placeholder="Token Number"
+          className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 transition"
+        />
+        <button
+          onClick={handleComplete}
+          disabled={loading}
+          className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-semibold transition disabled:opacity-50"
+        >
+          ✅ Complete
+        </button>
+      </div>
+    </div>
+
+    {/* Final Payment */}
+    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+      <h3 className="font-bold text-gray-800 text-lg mb-2">💰 Final Payment</h3>
+      <p className="text-gray-500 text-sm mb-4">Patient clinic aa gaya — baki 50% receive karo</p>
+      <div className="flex space-x-3">
+        <input
+          type="number"
+          value={tokenNumber}
+          onChange={(e) => setTokenNumber(e.target.value)}
+          placeholder="Token Number"
+          className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 transition"
+        />
+        <button
+          onClick={() => handleFinalPayment(tokenNumber)}
+          disabled={loading}
+          className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 rounded-lg font-semibold transition disabled:opacity-50"
+        >
+          💳 Final Pay
+        </button>
+      </div>
+    </div>
+
+  </div>
+)}
 
         {/* MEDICAL REPORTS TAB */}
         {activeTab === 'reports' && (
@@ -502,7 +563,7 @@ const handlePatientChange = async (patientId) => {
           </div>
         )}
 
-        {/* PAYMENTS TAB */}
+       {/* PAYMENTS TAB */}
         {activeTab === 'payments' && (
           <div>
             <h2 className="text-2xl font-bold text-gray-800 mb-6">All Payments</h2>
@@ -517,22 +578,41 @@ const handlePatientChange = async (patientId) => {
                   <div key={index} className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
                     <div className="flex justify-between items-start">
                       <div>
-                        <h4 className="font-bold text-gray-800">{payment.user?.name}</h4>
+                        <h4 className="font-bold text-gray-800 text-lg">{payment.user?.name}</h4>
                         <p className="text-gray-500 text-sm">{payment.user?.email}</p>
-                        <p className="text-gray-500 text-sm mt-1">Doctor: {payment.doctor?.name}</p>
-                        <p className="text-gray-500 text-xs mt-1">{new Date(payment.createdAt).toLocaleDateString()}</p>
+                        <p className="text-gray-500 text-sm">📞 {payment.user?.phone || 'N/A'}</p>
+                        <p className="text-blue-600 text-sm font-semibold mt-1">👨‍⚕️ {payment.doctor?.name}</p>
+                        <p className="text-gray-500 text-xs mt-1">📅 {new Date(payment.createdAt).toLocaleDateString()}</p>
+                        <p className="text-gray-500 text-xs">💳 Method: {payment.paymentMethod}</p>
                       </div>
-                      <div className="text-right">
-                        <p className="font-bold text-gray-800">Rs. {payment.totalAmount}</p>
-                        <p className="text-green-600 text-sm">Advance: Rs. {payment.advanceAmount}</p>
-                        <p className="text-orange-500 text-sm">Remaining: Rs. {payment.remainingAmount}</p>
-                        <span className={`text-xs px-3 py-1 rounded-full font-semibold mt-2 inline-block ${
-                          payment.advanceStatus === 'paid' ? 'bg-green-100 text-green-700' :
+                      <div className="text-right space-y-1">
+                        <p className="font-bold text-gray-800 text-lg">Rs. {payment.totalAmount}</p>
+                        <p className="text-green-600 text-sm">✅ Advance: Rs. {payment.advanceAmount}</p>
+                        <p className="text-orange-500 text-sm">⏳ Remaining: Rs. {payment.remainingAmount}</p>
+                        <span className={`text-xs px-3 py-1 rounded-full font-semibold inline-block ${
+                          payment.finalStatus === 'paid' ? 'bg-green-100 text-green-700' :
                           payment.advanceStatus === 'cancelled' ? 'bg-red-100 text-red-700' :
                           'bg-yellow-100 text-yellow-700'
                         }`}>
-                          {payment.advanceStatus}
+                          {payment.finalStatus === 'paid' ? '✅ Fully Paid' :
+                           payment.advanceStatus === 'cancelled' ? '❌ Cancelled' : '⏳ Advance Paid'}
                         </span>
+                        {payment.finalStatus !== 'paid' && payment.advanceStatus !== 'cancelled' && (
+                          <button
+                            onClick={async () => {
+                              try {
+                                await completeFinalPayment(payment._id);
+                                setMessage(`✅ Final payment complete — ${payment.user?.name}`);
+                                fetchPayments();
+                              } catch (err) {
+                                setError('Payment failed');
+                              }
+                            }}
+                            className="block w-full mt-2 bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg text-sm font-semibold transition"
+                          >
+                            💳 Receive Final Payment
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>

@@ -45,4 +45,7 @@ export const createMedicalReport = (data) => API.post('/medical-reports/create',
 export const getPatientReports = (patientId) => API.get(`/medical-reports/patient/${patientId}`);
 export const getAllUsers = () => API.get('/auth/users');
 export const getPatientQueue = (userId) => API.get(`/queue/patient/${userId}`);
+
+export const completeFinalPayment = (paymentId) => API.put(`/payments/${paymentId}/complete`);
+export const getQueuePayment = (queueId) => API.get(`/payments/queue/${queueId}`);
 export default API;
