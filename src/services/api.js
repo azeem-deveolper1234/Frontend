@@ -48,4 +48,10 @@ export const getPatientQueue = (userId) => API.get(`/queue/patient/${userId}`);
 
 export const completeFinalPayment = (paymentId) => API.put(`/payments/${paymentId}/complete`);
 export const getQueuePayment = (queueId) => API.get(`/payments/queue/${queueId}`);
+
+export const addDoctor = (data) => API.post('/doctors/add', data);
+export const updateDoctor = (id, data) => API.put(`/doctors/${id}/update`, data);
+export const deleteDoctor = (id) => API.delete(`/doctors/${id}/delete`);
+
+
 export default API;

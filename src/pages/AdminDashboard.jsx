@@ -10,8 +10,11 @@ import {
   getAllUsers, 
   getAllDoctors,
   getPatientQueue,
-  getQueuePayment,        // ✅ add
-  completeFinalPayment    // ✅ add
+  getQueuePayment,
+  completeFinalPayment,
+  addDoctor,
+  updateDoctor,
+  deleteDoctor
 } from '../services/api';
 
 const AdminDashboard = () => {  
@@ -20,8 +23,26 @@ const AdminDashboard = () => {
   const [todayStats, setTodayStats] = useState(null);
   const [overallStats, setOverallStats] = useState(null);
   const [payments, setPayments] = useState([]);
-  const [users, setUsers] = useState([]);
-  const [doctors, setDoctors] = useState([]);
+ const [users, setUsers] = useState([]);
+const [doctors, setDoctors] = useState([]); // 👈 yahan
+const [doctorForm, setDoctorForm] = useState({
+
+  name: '',
+  specialization: '',
+  email: '',
+  phone: '',
+  slotDuration: 15,
+  maxPatientsPerDay: 20,
+  consultationFee: 1000,
+  schedule: [
+    { day: 'Monday', startTime: '09:00', endTime: '17:00', isAvailable: true },
+    { day: 'Tuesday', startTime: '09:00', endTime: '17:00', isAvailable: true },
+    { day: 'Wednesday', startTime: '09:00', endTime: '17:00', isAvailable: true },
+    { day: 'Thursday', startTime: '09:00', endTime: '17:00', isAvailable: true },
+    { day: 'Friday', startTime: '09:00', endTime: '17:00', isAvailable: true },
+  ]
+});
+
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
@@ -171,6 +192,7 @@ const handleFinalPayment = async (tokenNum) => {
     setMessage('');
     setError('');
     if (tab === 'payments') fetchPayments();
+    if (tab === 'doctors') fetchDoctors();
 if (tab === 'reports') {
   fetchUsers();
   fetchDoctors();
@@ -217,10 +239,11 @@ const handlePatientChange = async (patientId) => {
         <div className="max-w-7xl mx-auto px-4">
           <div className="flex space-x-1 overflow-x-auto">
             {[
-              { id: 'dashboard', label: '📊 Dashboard' },
-              { id: 'queue', label: '👥 Queue Manager' },
-              { id: 'reports', label: '🏥 Medical Reports' },
-              { id: 'payments', label: '💰 Payments' },
+             { id: 'dashboard', label: '📊 Dashboard' },
+{ id: 'queue', label: '👥 Queue Manager' },
+{ id: 'doctors', label: '👨‍⚕️ Doctors' },
+{ id: 'reports', label: '🏥 Medical Reports' },
+{ id: 'payments', label: '💰 Payments' },
             ].map(tab => (
               <button
                 key={tab.id}
@@ -562,6 +585,100 @@ const handlePatientChange = async (patientId) => {
             </form>
           </div>
         )}
+
+
+{/* DOCTORS TAB */}
+{activeTab === 'doctors' && (
+  <div className="max-w-2xl mx-auto">
+    <h2 className="text-2xl font-bold text-gray-800 mb-6">Doctor Management</h2>
+
+    {/* Add Doctor Form */}
+    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
+      <h3 className="font-bold text-gray-800 text-lg mb-4">➕ Add New Doctor</h3>
+      <div className="space-y-3">
+        <input type="text" placeholder="Doctor Name" value={doctorForm.name}
+          onChange={(e) => setDoctorForm({...doctorForm, name: e.target.value})}
+          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+        <input type="text" placeholder="Specialization" value={doctorForm.specialization}
+          onChange={(e) => setDoctorForm({...doctorForm, specialization: e.target.value})}
+          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+        <input type="email" placeholder="Email" value={doctorForm.email}
+          onChange={(e) => setDoctorForm({...doctorForm, email: e.target.value})}
+          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+        <input type="text" placeholder="Phone" value={doctorForm.phone}
+          onChange={(e) => setDoctorForm({...doctorForm, phone: e.target.value})}
+          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+        <div className="grid grid-cols-3 gap-3">
+          <input type="number" placeholder="Slot (min)" value={doctorForm.slotDuration}
+            onChange={(e) => setDoctorForm({...doctorForm, slotDuration: e.target.value})}
+            className="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          <input type="number" placeholder="Max Patients" value={doctorForm.maxPatientsPerDay}
+            onChange={(e) => setDoctorForm({...doctorForm, maxPatientsPerDay: e.target.value})}
+            className="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          <input type="number" placeholder="Fee (Rs.)" value={doctorForm.consultationFee}
+            onChange={(e) => setDoctorForm({...doctorForm, consultationFee: e.target.value})}
+            className="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+        </div>
+        <button
+          onClick={async () => {
+            try {
+              await addDoctor(doctorForm);
+              setMessage('✅ Doctor added successfully!');
+              fetchDoctors();
+              setDoctorForm({name:'',specialization:'',email:'',phone:'',slotDuration:15,maxPatientsPerDay:20,consultationFee:1000,schedule:[
+                {day:'Monday',startTime:'09:00',endTime:'17:00',isAvailable:true},
+                {day:'Tuesday',startTime:'09:00',endTime:'17:00',isAvailable:true},
+                {day:'Wednesday',startTime:'09:00',endTime:'17:00',isAvailable:true},
+                {day:'Thursday',startTime:'09:00',endTime:'17:00',isAvailable:true},
+                {day:'Friday',startTime:'09:00',endTime:'17:00',isAvailable:true},
+              ]});
+            } catch (err) {
+              setError(err.response?.data?.message || 'Failed');
+            }
+          }}
+          className="w-full bg-gradient-to-r from-blue-700 to-blue-500 text-white py-3 rounded-lg font-semibold hover:from-blue-800 hover:to-blue-600 transition"
+        >
+          ➕ Add Doctor
+        </button>
+      </div>
+    </div>
+
+    {/* Doctors List */}
+    <h3 className="font-bold text-gray-800 text-lg mb-4">All Doctors</h3>
+    <div className="space-y-4">
+      {doctors.map((doc, index) => (
+        <div key={index} className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+          <div className="flex justify-between items-start">
+            <div>
+              <h4 className="font-bold text-gray-800">{doc.name}</h4>
+              <p className="text-blue-600 text-sm">{doc.specialization}</p>
+              <p className="text-gray-500 text-sm">📞 {doc.phone}</p>
+              <p className="text-gray-500 text-sm">⏱️ {doc.slotDuration} min | 👥 Max {doc.maxPatientsPerDay}</p>
+              <p className="text-green-600 text-sm font-semibold">💰 Rs. {doc.consultationFee}</p>
+            </div>
+            <button
+              onClick={async () => {
+                if (window.confirm('Delete karna chahte ho?')) {
+                  try {
+                    await deleteDoctor(doc._id);
+                    setMessage('✅ Doctor removed!');
+                    fetchDoctors();
+                  } catch (err) {
+                    setError('Failed to delete');
+                  }
+                }
+              }}
+              className="bg-red-100 hover:bg-red-200 text-red-600 px-4 py-2 rounded-lg text-sm font-semibold transition"
+            >
+              🗑️ Remove
+            </button>
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
+)}
+
 
        {/* PAYMENTS TAB */}
         {activeTab === 'payments' && (
