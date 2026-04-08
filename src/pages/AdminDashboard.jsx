@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { 
   callNextPatient, 
@@ -23,6 +24,8 @@ const AdminDashboard = () => {
   const [todayStats, setTodayStats] = useState(null);
   const [overallStats, setOverallStats] = useState(null);
   const [payments, setPayments] = useState([]);
+  const [selectedType, setSelectedType] = useState(null);
+const [showDetails, setShowDetails] = useState(false);
  const [users, setUsers] = useState([]);
 const [doctors, setDoctors] = useState([]); // 👈 yahan
 const [doctorForm, setDoctorForm] = useState({
@@ -69,12 +72,15 @@ useEffect(() => {
   fetchDoctors(); // 👈 add karo
 }, []);
 
-  const fetchTodayStats = async () => {
-    try {
-      const res = await getAnalyticsToday();
-      setTodayStats(res.data);
-    } catch (err) {}
-  };
+ const fetchTodayStats = async () => {
+  try {
+    const res = await api.get('/analytics/today');
+    console.log("Backend Data Check:", res.data); // Console mein check karein data aa raha hai ya nahi
+    setTodayStats(res.data);
+  } catch (error) {
+    console.error("Error fetching today stats:", error);
+  }
+};
 
   const fetchOverallStats = async () => {
     try {
@@ -267,6 +273,7 @@ const handlePatientChange = async (patientId) => {
         {error && <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg mb-6">⚠️ {error}</div>}
 
         {/* DASHBOARD TAB */}
+  {/* DASHBOARD TAB */}
         {activeTab === 'dashboard' && (
           <div>
             <div className="flex justify-between items-center mb-6">
@@ -278,12 +285,16 @@ const handlePatientChange = async (patientId) => {
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
               {[
-                { label: 'Total Patients', value: todayStats?.totalPatients || 0, color: 'blue', icon: '👥' },
-                { label: 'Completed', value: todayStats?.completedPatients || 0, color: 'green', icon: '✅' },
-                { label: 'Waiting', value: todayStats?.waitingPatients || 0, color: 'yellow', icon: '⏳' },
-                { label: 'Emergency', value: todayStats?.emergencyPatients || 0, color: 'red', icon: '🚨' },
+                { id: 'all', label: 'Total Patients', value: todayStats?.totalPatients || 0, color: 'blue', icon: '👥' },
+                { id: 'completed', label: 'Completed', value: todayStats?.completedPatients || 0, color: 'green', icon: '✅' },
+                { id: 'waiting', label: 'Waiting', value: todayStats?.waitingPatients || 0, color: 'yellow', icon: '⏳' },
+                { id: 'emergency', label: 'Emergency', value: todayStats?.emergencyPatients || 0, color: 'red', icon: '🚨' },
               ].map((stat, i) => (
-                <div key={i} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 text-center">
+                <div 
+                  key={i} 
+                  onClick={() => { setSelectedType(stat.id); setShowDetails(true); }}
+                  className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 text-center cursor-pointer hover:bg-gray-50 transition active:scale-95"
+                >
                   <div className="text-3xl mb-2">{stat.icon}</div>
                   <div className={`text-4xl font-bold text-${stat.color}-600`}>{stat.value}</div>
                   <div className="text-gray-500 text-sm mt-1">{stat.label}</div>
@@ -291,24 +302,92 @@ const handlePatientChange = async (patientId) => {
               ))}
             </div>
 
-            <h3 className="text-xl font-bold text-gray-800 mb-4">Overall Statistics</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="bg-gradient-to-br from-blue-600 to-blue-400 rounded-2xl p-6 text-white">
-                <div className="text-4xl font-bold">{overallStats?.totalPatients || 0}</div>
-                <div className="text-blue-100 mt-1">Total Patients Ever</div>
+            {/* DETAILS TABLE: Card par click karne se ye dikhega */}
+            {showDetails && (
+              <div className="bg-white rounded-2xl shadow-md border border-gray-100 p-6 mb-8 animate-in fade-in slide-in-from-top-4 duration-300">
+                <div className="flex justify-between items-center mb-4 border-b pb-2">
+                  <h3 className="font-bold text-gray-700 uppercase">📋 {selectedType} Patients List</h3>
+                  <button onClick={() => setShowDetails(false)} className="text-red-500 text-sm font-bold hover:bg-red-50 px-2 py-1 rounded">Close ✖</button>
+                </div>
+                
+                <div className="max-h-80 overflow-y-auto">
+                  <table className="w-full text-left">
+                    <thead className="sticky top-0 bg-gray-50 shadow-sm">
+                      <tr className="text-gray-600 text-sm border-b">
+                        <th className="p-3">Token</th>
+                        <th className="p-3">Patient Name</th>
+                        <th className="p-3">Doctor/Service</th>
+                        <th className="p-3">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+  {(() => {
+    // Data source select karein
+    const dataSource = selectedType === 'Overall' 
+      ? overallStats?.allQueueHistory 
+      : todayStats?.allQueueToday;
+
+    // Console mein check karne ke liye (Debug)
+    console.log("Current Data Source:", dataSource);
+
+    if (!dataSource || dataSource.length === 0) return null;
+
+    return dataSource
+      .filter(q => {
+        if (selectedType === 'all' || selectedType === 'Overall') return true;
+        if (selectedType === 'emergency') return q.priority === 'emergency';
+        return q.status === selectedType;
+      })
+      .map((item, idx) => (
+        <tr key={idx} className="hover:bg-blue-50 transition border-b">
+          <td className="p-3 font-bold text-blue-600">#{item.tokenNumber}</td>
+          <td className="p-3 text-gray-800 font-medium">
+            {item.user?.name || 'Walk-in Patient'}
+          </td>
+          <td className="p-3 text-gray-600 text-sm">{item.serviceName}</td>
+          <td className="p-3">
+            <span className={`text-xs px-2 py-1 rounded-full font-bold ${
+              item.status === 'completed' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
+            }`}>
+              {item.status?.toUpperCase() || 'WAITING'}
+            </span>
+          </td>
+        </tr>
+      ));
+  })()}
+</tbody>
+                  </table>
+                  {/* Jab koi data na ho */}
+                  {(!(selectedType === 'Overall' ? overallStats?.allQueueHistory : todayStats?.allQueueToday)?.length) && (
+                    <div className="text-center py-10 text-gray-400 italic">No bookings found in this category.</div>
+                  )}
+                </div>
               </div>
+            )}
+
+            <h3 className="text-xl font-bold text-gray-800 mb-4">Overall Statistics</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-10">
+              <div 
+                onClick={() => { setSelectedType('Overall'); setShowDetails(true); }}
+                className="bg-gradient-to-br from-blue-600 to-blue-400 rounded-2xl p-6 text-white cursor-pointer hover:shadow-lg transition active:scale-95"
+              >
+                <div className="text-4xl font-bold">{overallStats?.totalPatients || 0}</div>
+                <div className="text-blue-100 mt-1">Total Patients Ever (Click to view)</div>
+              </div>
+
               <div className="bg-gradient-to-br from-green-600 to-green-400 rounded-2xl p-6 text-white">
                 <div className="text-4xl font-bold">{overallStats?.completionRate || '0%'}</div>
                 <div className="text-green-100 mt-1">Completion Rate</div>
               </div>
+
               <div className="bg-gradient-to-br from-purple-600 to-purple-400 rounded-2xl p-6 text-white">
                 <div className="text-4xl font-bold">{overallStats?.mostBusyService || 'N/A'}</div>
                 <div className="text-purple-100 mt-1">Most Busy Service</div>
               </div>
             </div>
           </div>
-        )}
-
+        
+)}
 {/* QUEUE MANAGER TAB */}
 {activeTab === 'queue' && (
   <div className="max-w-2xl mx-auto space-y-6">
