@@ -24,6 +24,12 @@ const [joinForm, setJoinForm] = useState({
   totalAmount: '',
   paymentMethod: 'cash'
 });
+
+const [showGateway, setShowGateway] = useState(false);
+const [gatewayStep, setGatewayStep] = useState('phone'); // phone, otp, processing, success
+const [gatewayPhone, setGatewayPhone] = useState('');
+const [gatewayOtp, setGatewayOtp] = useState('');
+
 const [payments, setPayments] = useState([]);
 const [paymentForm, setPaymentForm] = useState({
   queueId: '',
@@ -31,7 +37,6 @@ const [paymentForm, setPaymentForm] = useState({
   totalAmount: '',
   paymentMethod: 'cash'
 });
-
 useEffect(() => {
   fetchDoctors();
   fetchQueueStatus();
@@ -54,8 +59,9 @@ useEffect(() => {
     }
   });
 
-  socket.on('queueCompleted', () => {
+  socket.on('queueCompleted', (data) => {
     fetchQueueStatus();
+    setMessage(`✅ Aapka checkup complete ho gaya! Token: ${data.tokenNumber} — Shukriya!`);
   });
 
   socket.on('queueCancelled', () => {
@@ -68,15 +74,12 @@ useEffect(() => {
   }
 
   return () => {
-
-    
     clearInterval(interval);
     socket.off('queueUpdated');
     socket.off('queueCompleted');
     socket.off('queueCancelled');
   };
 }, []);
-
  
 
   const fetchDoctors = async () => {
@@ -87,13 +90,17 @@ useEffect(() => {
   };
 
   const fetchQueueStatus = async () => {
-    try {
-      const res = await getQueueStatus();
-      setQueueStatus(res.data);
-    } catch (err) {
+  try {
+    const res = await getQueueStatus();
+    setQueueStatus(res.data);
+  } catch (err) {
+    setQueueStatus(null);
+    // Agar "Not in queue" aaye toh check karo history mein
+    if (err.response?.status === 404) {
       setQueueStatus(null);
     }
-  };
+  }
+};
 
   const fetchHistory = async () => {
     try {
@@ -115,11 +122,15 @@ useEffect(() => {
       setReports(res.data.reports);
     } catch (err) {}
   };
-const handleJoinQueue = async (e) => {
-  e.preventDefault();
+const processJoinQueue = async () => {
+  console.log("doctors:", doctors);
+console.log("serviceName:", joinForm.serviceName);
+const doctorObj = doctors.find(d => d.name === joinForm.serviceName);
+console.log("doctorObj:", doctorObj);
   setLoading(true);
   setError('');
   setMessage('');
+  const bookingTime = new Date();
   try {
     // Step 1: Queue join karo
     const queueRes = await joinQueue({
@@ -130,30 +141,49 @@ const handleJoinQueue = async (e) => {
     });
 
     const newQueueId = queueRes.data._id;
-    const doctorObj = doctors.find(d => d.name === joinForm.serviceName);
+    
 
     // Step 2: Payment karo
-    if (joinForm.totalAmount && newQueueId && doctorObj) {
-      await createPayment({
-        queueId: newQueueId,
-        doctorId: doctorObj._id,
-        totalAmount: parseInt(joinForm.totalAmount),
-        paymentMethod: joinForm.paymentMethod
-      });
-    }
+ if (newQueueId && doctorObj) {
+
+   console.log("Payment create ho rahi hai:", {
+    queueId: newQueueId,
+    doctorId: doctorObj._id,
+    totalAmount: joinForm.totalAmount,
+  });
+  await createPayment({
+    queueId: newQueueId,
+    doctorId: doctorObj._id,
+    totalAmount: joinForm.totalAmount || doctorObj.consultationFee || 1000,
+    paymentMethod: joinForm.paymentMethod
+  });
+}
 
     // Step 3: Receipt dikhao
-    setReceiptData({
-      tokenNumber: queueRes.data.tokenNumber,
-      patientName: user.name,
-      email: user.email,
-      phone: user.phone || '',
-      doctorName: joinForm.serviceName,
-      appointmentDate: joinForm.appointmentDate,
-      priority: joinForm.priority,
-      notes: joinForm.notes,
-      totalAmount: joinForm.totalAmount ? parseInt(joinForm.totalAmount) : null
-    });
+  const bookingTime = new Date();
+
+setReceiptData({
+  tokenNumber: queueRes.data.tokenNumber,
+  patientName: user.name,
+  email: user.email,
+  phone: user.phone || '',
+  doctorName: joinForm.serviceName,
+
+  // ✅ FIXED DATE (no timezone issue)
+  appointmentDate: joinForm.appointmentDate,
+
+  // ✅ booking time (perfect)
+  bookingTime: bookingTime.toLocaleString('en-PK', {
+    dateStyle: 'medium',
+    timeStyle: 'short'
+  }),
+
+  priority: joinForm.priority,
+  notes: joinForm.notes,
+  totalAmount: doctorObj ? doctorObj.consultationFee : null,
+});
+  
+
     setShowReceipt(true);
 
     fetchQueueStatus();
@@ -171,6 +201,41 @@ const handleJoinQueue = async (e) => {
     setError(err.response?.data?.message || 'Booking failed');
   }
   setLoading(false);
+};
+
+// Naya interceptor jo mock gateway check karta hai
+const handleJoinQueue = (e) => {
+  e.preventDefault();
+  if (joinForm.paymentMethod === 'easypaisa' || joinForm.paymentMethod === 'jazzcash' || joinForm.paymentMethod === 'card') {
+    setGatewayStep('phone');
+    setGatewayPhone('');
+    setGatewayOtp('');
+    setShowGateway(true);
+  } else {
+    processJoinQueue();
+  }
+};
+
+const handleGatewayNext = () => {
+  if (gatewayStep === 'phone') {
+    if (!gatewayPhone) return setError('Pehle number tou dalein!');
+    setError('');
+    setGatewayStep('otp');
+  } else if (gatewayStep === 'otp') {
+    if (gatewayOtp.length < 4) return setError('4-digit OTP laazmi hai');
+    setError('');
+    setGatewayStep('processing');
+    
+    // Simulate processing delay
+    setTimeout(() => {
+      setGatewayStep('success');
+      // Thori der baad close ho kar queue api trigger hoga
+      setTimeout(() => {
+        setShowGateway(false);
+        processJoinQueue();
+      }, 1500);
+    }, 2000);
+  }
 };
   const handleCancelQueue = async () => {
     if (!window.confirm('Are you sure you want to cancel?')) return;
@@ -201,6 +266,106 @@ const handleJoinQueue = async (e) => {
     data={receiptData}
     onClose={() => setShowReceipt(false)}
   />
+)}
+
+{/* --- MOCK PAYMENT GATEWAY MODAL --- */}
+{showGateway && (
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-300">
+    <div className={`bg-white w-full max-w-sm rounded-[24px] shadow-2xl overflow-hidden ${(joinForm.paymentMethod === 'easypaisa' ? 'border-t-4 border-green-500' : (joinForm.paymentMethod === 'jazzcash' ? 'border-t-4 border-red-500' : 'border-t-4 border-blue-500'))}`}>
+        
+      {/* Header */}
+      <div className={`p-6 text-center text-white ${(joinForm.paymentMethod === 'easypaisa' ? 'bg-gradient-to-br from-green-500 to-green-600' : (joinForm.paymentMethod === 'jazzcash' ? 'bg-gradient-to-br from-red-600 to-red-700' : 'bg-gradient-to-br from-blue-600 to-blue-800'))}`}>
+        <h2 className="text-2xl font-extrabold tracking-tight">
+          {joinForm.paymentMethod === 'easypaisa' ? 'Easypaisa' : (joinForm.paymentMethod === 'jazzcash' ? 'JazzCash' : 'Secure Card')}
+        </h2>
+        <p className="text-white/80 text-sm mt-1">Virtual Checkout</p>
+      </div>
+
+      {/* Body */}
+      <div className="p-6">
+        
+        {/* Step: Phone / Card Input */}
+        {gatewayStep === 'phone' && (
+          <div className="space-y-4 animate-in slide-in-from-right-4 duration-300">
+            <p className="text-center text-gray-600 font-medium text-sm">Amount to Pay: <span className="text-xl font-bold text-gray-800 block mt-1">Rs. {(doctors.find(d => d.name === joinForm.serviceName)?.consultationFee || 1000) / 2}</span></p>
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                {joinForm.paymentMethod === 'card' ? 'Card Number' : 'Mobile Number'}
+              </label>
+              <input 
+                type={joinForm.paymentMethod === 'card' ? 'text' : 'tel'}
+                className="w-full bg-gray-50 border border-gray-200 px-4 py-3 rounded-xl text-lg font-mono placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 transition-all shadow-inner"
+                placeholder={joinForm.paymentMethod === 'card' ? '4111 1111 1111 1111' : '03XX XXXXXXX'}
+                value={gatewayPhone}
+                onChange={(e) => setGatewayPhone(e.target.value)}
+                autoFocus
+              />
+            </div>
+            {error && <p className="text-red-500 text-xs font-semibold text-center mt-2">{error}</p>}
+            <button 
+              onClick={handleGatewayNext}
+              className={`w-full py-3 mt-2 rounded-xl text-white font-bold text-lg shadow-md transition-all hover:scale-[1.02] active:scale-[0.98] ${(joinForm.paymentMethod === 'easypaisa' ? 'bg-green-600 hover:bg-green-700 shadow-green-500/30' : (joinForm.paymentMethod === 'jazzcash' ? 'bg-red-600 hover:bg-red-700 shadow-red-500/30' : 'bg-blue-600 hover:bg-blue-700 shadow-blue-500/30'))}`}
+            >
+              Continue
+            </button>
+            <button onClick={() => setShowGateway(false)} className="w-full text-center text-gray-400 text-sm mt-3 hover:text-gray-600 transition">Cancel</button>
+          </div>
+        )}
+
+        {/* Step: OTP */}
+        {gatewayStep === 'otp' && (
+          <div className="space-y-4 text-center animate-in slide-in-from-right-4 duration-300">
+            <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-2 shadow-sm">
+              <span className="text-2xl">💬</span>
+            </div>
+            <p className="text-gray-600 text-sm">Enter 4-digit verification code sent to <br/><strong className="text-gray-800">{gatewayPhone}</strong></p>
+            <input 
+              type="text" 
+              maxLength="4"
+              className="w-32 mx-auto bg-gray-50 border border-gray-200 px-4 py-3 rounded-xl text-2xl font-bold tracking-[0.5em] text-center focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all shadow-inner"
+              placeholder="1234"
+              value={gatewayOtp}
+              onChange={(e) => setGatewayOtp(e.target.value)}
+              autoFocus
+            />
+            {error && <p className="text-red-500 text-xs font-semibold">{error}</p>}
+            <button 
+              onClick={handleGatewayNext}
+              className="w-full bg-gray-900 text-white py-3 rounded-xl font-bold text-lg shadow-md transition-all hover:bg-black hover:scale-[1.02] active:scale-[0.98] mt-2"
+            >
+              Verify & Pay
+            </button>
+            <button onClick={() => setGatewayStep('phone')} className="w-full text-center text-gray-400 text-sm mt-3 hover:text-gray-600 transition">Back</button>
+          </div>
+        )}
+
+        {/* Step: Processing */}
+        {gatewayStep === 'processing' && (
+          <div className="py-10 text-center animate-pulse">
+            <div className="inline-block relative w-20 h-20 mb-4">
+              <div className={`absolute inset-0 rounded-full border-4 border-t-transparent animate-spin ${(joinForm.paymentMethod === 'easypaisa' ? 'border-green-500' : (joinForm.paymentMethod === 'jazzcash' ? 'border-red-500' : 'border-blue-500'))}`}></div>
+              <div className="absolute inset-0 flex items-center justify-center text-3xl">🔒</div>
+            </div>
+            <h3 className="text-xl font-bold text-gray-800">Processing Payment...</h3>
+            <p className="text-gray-400 text-sm mt-2">Please do not close this window</p>
+          </div>
+        )}
+
+        {/* Step: Success */}
+        {gatewayStep === 'success' && (
+          <div className="py-10 text-center animate-in zoom-in-90 duration-500">
+            <div className={`w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-4 text-5xl shadow-xl ${(joinForm.paymentMethod === 'easypaisa' ? 'bg-green-100 text-green-600 shadow-green-500/20' : (joinForm.paymentMethod === 'jazzcash' ? 'bg-red-100 text-red-600 shadow-red-500/20' : 'bg-blue-100 text-blue-600 shadow-blue-500/20'))}`}>
+              <span>✓</span>
+            </div>
+            <h3 className="text-2xl font-extrabold text-gray-800">Successful!</h3>
+            <p className="text-gray-500 text-sm mt-2">Payment securely captured.</p>
+            <p className="text-xs text-gray-400 mt-6 animate-pulse">Redirecting to clinic receipt...</p>
+          </div>
+        )}
+
+      </div>
+    </div>
+  </div>
 )}
       {/* Navbar */}
       <nav className="bg-gradient-to-r from-blue-800 to-blue-600 shadow-lg">
@@ -271,55 +436,55 @@ const handleJoinQueue = async (e) => {
           <div>
             <h2 className="text-2xl font-bold text-gray-800 mb-6">Welcome, {user?.name}! 👋</h2>
 
-            {/* Quick Status */}
-            {queueStatus ? (
-              <div className="bg-gradient-to-r from-blue-600 to-blue-400 rounded-2xl p-6 text-white mb-6">
-                <h3 className="text-lg font-semibold mb-4">Your Current Queue Status</h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className="bg-white bg-opacity-20 rounded-xl p-4 text-center">
-                    <div className="text-3xl font-bold">{queueStatus.yourToken}</div>
-                    <div className="text-sm opacity-80">Your Token</div>
-                  </div>
-                  <div className="bg-white bg-opacity-20 rounded-xl p-4 text-center">
-                    <div className="text-3xl font-bold">{queueStatus.currentServing}</div>
-                    <div className="text-sm opacity-80">Now Serving</div>
-                  </div>
-                  <div className="bg-white bg-opacity-20 rounded-xl p-4 text-center">
-                    <div className="text-3xl font-bold">{queueStatus.peopleAhead}</div>
-                    <div className="text-sm opacity-80">People Ahead</div>
-                  </div>
-                  <div className="bg-white bg-opacity-20 rounded-xl p-4 text-center">
-                    <div className="text-3xl font-bold">{queueStatus.estimatedTime}</div>
-                    <div className="text-sm opacity-80">Est. Minutes</div>
-                  </div>
-                </div>
-                <div className="mt-4 flex justify-between items-center">
-                  <span className={`px-3 py-1 rounded-full text-sm font-semibold ${
-                    queueStatus.status === 'serving' ? 'bg-green-400' : 'bg-yellow-400 text-gray-800'
-                  }`}>
-                    {queueStatus.status === 'serving' ? '🟢 Your Turn!' : '⏳ Waiting'}
-                  </span>
-                  <button
-                    onClick={handleCancelQueue}
-                    className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-semibold transition"
-                  >
-                    Cancel Queue
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-6 mb-6 text-center">
-                <div className="text-4xl mb-2">📋</div>
-                <p className="text-gray-600">You are not in any queue</p>
-                <button
-                  onClick={() => handleTabChange('book')}
-                  className="mt-3 bg-blue-600 text-white px-6 py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 transition"
-                >
-                  Book Appointment →
-                </button>
-              </div>
-            )}
-
+         {/* Quick Status */}
+{queueStatus ? (
+  <div className="bg-gradient-to-r from-blue-600 to-blue-400 rounded-2xl p-6 text-white mb-6">
+    <h3 className="text-lg font-semibold mb-4">Your Current Queue Status</h3>
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="bg-white bg-opacity-20 rounded-xl p-4 text-center">
+        <div className="text-3xl font-bold">{queueStatus.yourToken}</div>
+        <div className="text-sm opacity-80">Your Token</div>
+      </div>
+      <div className="bg-white bg-opacity-20 rounded-xl p-4 text-center">
+        <div className="text-3xl font-bold">{queueStatus.currentServing}</div>
+        <div className="text-sm opacity-80">Now Serving</div>
+      </div>
+      <div className="bg-white bg-opacity-20 rounded-xl p-4 text-center">
+        <div className="text-3xl font-bold">{queueStatus.peopleAhead}</div>
+        <div className="text-sm opacity-80">People Ahead</div>
+      </div>
+      <div className="bg-white bg-opacity-20 rounded-xl p-4 text-center">
+        <div className="text-3xl font-bold">{queueStatus.estimatedTime}</div>
+        <div className="text-sm opacity-80">Est. Minutes</div>
+      </div>
+    </div>
+    <div className="mt-4 flex justify-between items-center">
+      <span className={`px-3 py-1 rounded-full text-sm font-semibold ${
+        queueStatus.status === 'serving' ? 'bg-green-400' : 'bg-yellow-400 text-gray-800'
+      }`}>
+        {queueStatus.status === 'serving' ? '🟢 Your Turn!' : '⏳ Waiting'}
+      </span>
+      <button
+        onClick={handleCancelQueue}
+        className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-semibold transition"
+      >
+        Cancel Queue
+      </button>
+    </div>
+  </div>
+) : (
+  <div className="bg-green-50 border border-green-200 rounded-2xl p-6 mb-6 text-center">
+    <div className="text-4xl mb-2">✅</div>
+    <p className="text-green-700 font-semibold text-lg">Aapka checkup complete ho gaya!</p>
+    <p className="text-gray-500 text-sm mt-1">Medical Reports tab mein apni report dekh sakte hain</p>
+    <button
+      onClick={() => handleTabChange('book')}
+      className="mt-3 bg-blue-600 text-white px-6 py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 transition"
+    >
+      Naya Appointment Book Karein →
+    </button>
+  </div>
+)}
             {/* Doctors */}
             <h3 className="text-xl font-bold text-gray-800 mb-4">Available Doctors</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -430,9 +595,10 @@ const handleJoinQueue = async (e) => {
       onChange={(e) => setJoinForm({ ...joinForm, paymentMethod: e.target.value })}
       className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
     >
-      <option value="cash">Cash</option>
-      <option value="card">Card</option>
-      <option value="online">Online (JazzCash/EasyPaisa)</option>
+      <option value="cash">Cash at Clinic</option>
+      <option value="easypaisa">Easypaisa</option>
+      <option value="jazzcash">JazzCash</option>
+      <option value="card">Credit/Debit Card</option>
     </select>
   </div>
 
@@ -649,112 +815,8 @@ const handleJoinQueue = async (e) => {
           </div>
         )}
 
-{/* PAYMENTS TAB */}
-        {activeTab === 'payments' && (
-          <div className="max-w-lg mx-auto">
-            <h2 className="text-2xl font-bold text-gray-800 mb-6">My Payments</h2>
 
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
-              <h3 className="font-bold text-gray-800 text-lg mb-4">Make Advance Payment</h3>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Total Amount (Rs.)</label>
-                 <input
-  type="number"
-  value={joinForm.totalAmount}
-  readOnly
-  placeholder="Doctor select karne pe fee aayegi"
-  className="w-full px-4 py-3 border border-gray-200 rounded-lg bg-gray-50 text-gray-700 cursor-not-allowed"
-/>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Payment Method</label>
-                  <select
-                    value={paymentForm.paymentMethod}
-                    onChange={(e) => setPaymentForm({ ...paymentForm, paymentMethod: e.target.value })}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
-                  >
-                    <option value="cash">Cash</option>
-                    <option value="card">Card</option>
-                    <option value="online">Online (JazzCash/EasyPaisa)</option>
-                  </select>
-                </div>
-                <div className="bg-blue-50 rounded-xl p-4">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">Total Amount:</span>
-                    <span className="font-semibold">Rs. {paymentForm.totalAmount || 0}</span>
-                  </div>
-                  <div className="flex justify-between text-sm mt-1">
-                    <span className="text-gray-600">Advance (50%):</span>
-                    <span className="font-semibold text-green-600">Rs. {paymentForm.totalAmount ? paymentForm.totalAmount / 2 : 0}</span>
-                  </div>
-                  <div className="flex justify-between text-sm mt-1">
-                    <span className="text-gray-600">Remaining (at clinic):</span>
-                    <span className="font-semibold text-orange-500">Rs. {paymentForm.totalAmount ? paymentForm.totalAmount / 2 : 0}</span>
-                  </div>
-                </div>
-                <button
-                  onClick={async () => {
-                    if (!queueStatus) return setError('Pehle queue join karo!');
-                    setLoading(true);
-                    try {
-                      await createPayment({
-                        queueId: queueStatus._id || '',
-                        doctorId: doctors[0]?._id || '',
-                        totalAmount: parseInt(paymentForm.totalAmount),
-                        paymentMethod: paymentForm.paymentMethod
-                      });
-                      setMessage('✅ Advance payment successful!');
-                      fetchPayments();
-                    } catch (err) {
-                      setError(err.response?.data?.message || 'Payment failed');
-                    }
-                    setLoading(false);
-                  }}
-                  disabled={loading || !paymentForm.totalAmount}
-                  className="w-full bg-gradient-to-r from-green-600 to-green-400 text-white py-3 rounded-lg font-semibold text-lg hover:from-green-700 hover:to-green-500 transition disabled:opacity-50"
-                >
-                  {loading ? '⏳ Processing...' : '💳 Pay Advance (50%)'}
-                </button>
-              </div>
-            </div>
-
-            <h3 className="font-bold text-gray-800 text-lg mb-4">Payment History</h3>
-            {payments.length === 0 ? (
-              <div className="text-center py-8 bg-white rounded-2xl">
-                <div className="text-4xl mb-2">💰</div>
-                <p className="text-gray-500">No payments yet</p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {payments.map((payment, index) => (
-                  <div key={index} className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <h4 className="font-bold text-gray-800">{payment.doctor?.name}</h4>
-                        <p className="text-gray-500 text-sm mt-1">{new Date(payment.createdAt).toLocaleDateString()}</p>
-                        <p className="text-gray-500 text-sm">Method: {payment.paymentMethod}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="font-bold text-gray-800">Rs. {payment.totalAmount}</p>
-                        <p className="text-green-600 text-sm">Paid: Rs. {payment.advanceAmount}</p>
-                        <p className="text-orange-500 text-sm">Due: Rs. {payment.remainingAmount}</p>
-                        <span className={`text-xs px-3 py-1 rounded-full font-semibold mt-1 inline-block ${
-                          payment.advanceStatus === 'paid' ? 'bg-green-100 text-green-700' :
-                          payment.advanceStatus === 'cancelled' ? 'bg-red-100 text-red-700' :
-                          'bg-yellow-100 text-yellow-700'
-                        }`}>
-                          {payment.advanceStatus}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
+        
       </div>
     </div>
   );

@@ -15,7 +15,8 @@ import {
   completeFinalPayment,
   addDoctor,
   updateDoctor,
-  deleteDoctor
+  deleteDoctor,
+  clearOldData
 } from '../services/api';
 
 const AdminDashboard = () => {  
@@ -38,11 +39,11 @@ const [doctorForm, setDoctorForm] = useState({
   maxPatientsPerDay: 20,
   consultationFee: 1000,
   schedule: [
-    { day: 'Monday', startTime: '09:00', endTime: '17:00', isAvailable: true },
-    { day: 'Tuesday', startTime: '09:00', endTime: '17:00', isAvailable: true },
-    { day: 'Wednesday', startTime: '09:00', endTime: '17:00', isAvailable: true },
-    { day: 'Thursday', startTime: '09:00', endTime: '17:00', isAvailable: true },
-    { day: 'Friday', startTime: '09:00', endTime: '17:00', isAvailable: true },
+    { day: 'Monday', startTime: '09:00', endTime: '5:00', isAvailable: true },
+    { day: 'Tuesday', startTime: '09:00', endTime: '5:00', isAvailable: true },
+    { day: 'Wednesday', startTime: '09:00', endTime: '5:00', isAvailable: true },
+    { day: 'Thursday', startTime: '09:00', endTime: '5:00', isAvailable: true },
+    { day: 'Friday', startTime: '09:00', endTime: '5:00', isAvailable: true },
   ]
 });
 
@@ -89,12 +90,15 @@ useEffect(() => {
     } catch (err) {}
   };
 
-  const fetchPayments = async () => {
-    try {
-      const res = await getAllPayments();
-      setPayments(res.data.payments);
-    } catch (err) {}
-  };
+ const fetchPayments = async () => {
+  try {
+    const res = await getAllPayments();
+    console.log("PAYMENTS DATA:", res.data); // 👈 ADD THIS
+    setPayments(res.data.payments);
+  } catch (err) {
+    console.log(err);
+  }
+};
 
   const fetchUsers = async () => {
     try {
@@ -123,6 +127,11 @@ useEffect(() => {
     }
     setLoading(false);
   };
+
+
+
+
+ 
 
   const handleComplete = async () => {
     if (!tokenNumber) return setError('Token number daalo!');
@@ -217,6 +226,21 @@ const handlePatientChange = async (patientId) => {
     } catch (err) {}
   }
 };
+
+  const handleClearOldData = async () => {
+    if (!window.confirm("Kaya aap waqayi 2 hafte purana data delete karna chahte hain? Yeh database se clear ho jayega.")) return;
+    setLoading(true);
+    try {
+      const res = await clearOldData({ days: 14 });
+      setMessage('✅ ' + res.data.message);
+      fetchTodayStats();
+      fetchOverallStats();
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to clear data');
+    }
+    setLoading(false);
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
 
@@ -239,6 +263,7 @@ const handlePatientChange = async (patientId) => {
           </div>
         </div>
       </nav>
+
 
       {/* Tabs */}
       <div className="bg-white shadow-sm">
@@ -278,9 +303,18 @@ const handlePatientChange = async (patientId) => {
           <div>
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-2xl font-bold text-gray-800">Today's Overview</h2>
-              <button onClick={fetchTodayStats} className="bg-blue-100 text-blue-600 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-200 transition">
-                🔄 Refresh
-              </button>
+              <div className="flex space-x-3">
+                <button 
+                  onClick={handleClearOldData}
+                  disabled={loading}
+                  className="bg-red-100 text-red-600 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-red-200 transition"
+                >
+                  🗑️ Clear Old Data (14 Days)
+                </button>
+                <button onClick={fetchTodayStats} className="bg-blue-100 text-blue-600 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-200 transition">
+                  🔄 Refresh
+                </button>
+              </div>
             </div>
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
@@ -392,7 +426,6 @@ const handlePatientChange = async (patientId) => {
 {activeTab === 'queue' && (
   <div className="max-w-2xl mx-auto space-y-6">
     <h2 className="text-2xl font-bold text-gray-800">Queue Manager</h2>
-
     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
       <label className="block text-sm font-medium text-gray-700 mb-2">Select Doctor</label>
       <select
@@ -440,31 +473,8 @@ const handlePatientChange = async (patientId) => {
       </div>
     </div>
 
-    {/* Final Payment */}
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-      <h3 className="font-bold text-gray-800 text-lg mb-2">💰 Final Payment</h3>
-      <p className="text-gray-500 text-sm mb-4">Patient clinic aa gaya — baki 50% receive karo</p>
-      <div className="flex space-x-3">
-        <input
-          type="number"
-          value={tokenNumber}
-          onChange={(e) => setTokenNumber(e.target.value)}
-          placeholder="Token Number"
-          className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 transition"
-        />
-        <button
-          onClick={() => handleFinalPayment(tokenNumber)}
-          disabled={loading}
-          className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 rounded-lg font-semibold transition disabled:opacity-50"
-        >
-          💳 Final Pay
-        </button>
-      </div>
-    </div>
-
   </div>
 )}
-
         {/* MEDICAL REPORTS TAB */}
         {activeTab === 'reports' && (
           <div className="max-w-2xl mx-auto">
@@ -705,11 +715,11 @@ const handlePatientChange = async (patientId) => {
               setMessage('✅ Doctor added successfully!');
               fetchDoctors();
               setDoctorForm({name:'',specialization:'',email:'',phone:'',slotDuration:15,maxPatientsPerDay:20,consultationFee:1000,schedule:[
-                {day:'Monday',startTime:'09:00',endTime:'17:00',isAvailable:true},
-                {day:'Tuesday',startTime:'09:00',endTime:'17:00',isAvailable:true},
-                {day:'Wednesday',startTime:'09:00',endTime:'17:00',isAvailable:true},
-                {day:'Thursday',startTime:'09:00',endTime:'17:00',isAvailable:true},
-                {day:'Friday',startTime:'09:00',endTime:'17:00',isAvailable:true},
+                {day:'Monday',startTime:'09:00',endTime:'5:00',isAvailable:true},
+                {day:'Tuesday',startTime:'09:00',endTime:'5:00',isAvailable:true},
+                {day:'Wednesday',startTime:'09:00',endTime:'5:00',isAvailable:true},
+                {day:'Thursday',startTime:'09:00',endTime:'5:00',isAvailable:true},
+                {day:'Friday',startTime:'09:00',endTime:'5:00',isAvailable:true},
               ]});
             } catch (err) {
               setError(err.response?.data?.message || 'Failed');
@@ -794,20 +804,37 @@ const handlePatientChange = async (patientId) => {
                            payment.advanceStatus === 'cancelled' ? '❌ Cancelled' : '⏳ Advance Paid'}
                         </span>
                         {payment.finalStatus !== 'paid' && payment.advanceStatus !== 'cancelled' && (
-                          <button
-                            onClick={async () => {
-                              try {
-                                await completeFinalPayment(payment._id);
-                                setMessage(`✅ Final payment complete — ${payment.user?.name}`);
-                                fetchPayments();
-                              } catch (err) {
-                                setError('Payment failed');
-                              }
-                            }}
-                            className="block w-full mt-2 bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg text-sm font-semibold transition"
-                          >
-                            💳 Receive Final Payment
-                          </button>
+                          <div className="flex space-x-2 mt-2">
+  <button
+    onClick={async () => {
+      try {
+        await completeFinalPayment(payment._id, { method: 'cash' });
+        setMessage(`✅ Cash payment received — ${payment.user?.name}`);
+        fetchPayments();
+      } catch (err) {
+        setError('Payment failed');
+      }
+    }}
+    className="flex-1 bg-green-500 hover:bg-green-600 text-white px-3 py-2 rounded-lg text-sm font-semibold transition"
+  >
+    💵 Cash
+  </button>
+
+  <button
+    onClick={async () => {
+      try {
+        await completeFinalPayment(payment._id, { method: 'online' });
+        setMessage(`✅ Online payment received — ${payment.user?.name}`);
+        fetchPayments();
+      } catch (err) {
+        setError('Payment failed');
+      }
+    }}
+    className="flex-1 bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded-lg text-sm font-semibold transition"
+  >
+    💳 Online
+  </button>
+</div>
                         )}
                       </div>
                     </div>

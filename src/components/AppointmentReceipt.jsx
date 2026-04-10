@@ -54,10 +54,16 @@ const AppointmentReceipt = ({ data, onClose }) => {
             <span className="text-sm text-gray-500">Doctor</span>
             <span className="text-sm font-bold text-blue-800">{data.doctorName}</span>
           </div>
-          <div className="flex justify-between py-2 border-b border-gray-50">
-            <span className="text-sm text-gray-500">Appointment Date</span>
-            <span className="text-sm font-semibold text-gray-700">{new Date(data.appointmentDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
-          </div>
+<div className="flex justify-between py-2 border-b border-gray-50">
+  <span className="text-sm text-gray-500">Appointment Date</span>
+  <span className="text-sm font-semibold text-gray-700">
+    {new Date(data.appointmentDate + 'T00:00:00').toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    })}
+  </span>
+</div>
           <div className="flex justify-between py-2 border-b border-gray-50">
             <span className="text-sm text-gray-500">Time Slot</span>
             <span className="text-sm font-semibold text-gray-700">09:00 AM — 05:00 PM</span>
@@ -73,9 +79,11 @@ const AppointmentReceipt = ({ data, onClose }) => {
             <span className="text-sm font-semibold text-gray-700">{data.notes || 'General Checkup'}</span>
           </div>
           <div className="flex justify-between py-2">
-            <span className="text-sm text-gray-500">Booked On</span>
-            <span className="text-sm font-semibold text-gray-700">{new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
-          </div>
+  <span className="text-sm text-gray-500">Booked On</span>
+  <span className="text-sm font-semibold text-gray-700">
+    {data.bookingTime}
+  </span>
+</div>
         </div>
 
         {/* Payment Summary */}

@@ -7,8 +7,6 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import PatientDashboard from './pages/PatientDashboard';
 import AdminDashboard from './pages/AdminDashboard';
-export const completeFinalPayment = (paymentId) => API.put(`/payments/${paymentId}/complete`);
-export const getPatientPayment = (queueId) => API.get(`/payments/queue/${queueId}`);
 
 // Protected Route — sirf login user dekh sake
 const ProtectedRoute = ({ children, adminOnly }) => {
