@@ -5,8 +5,28 @@ const AppointmentReceipt = ({ data, onClose }) => {
     window.print();
   };
 
+  const formatApptDate = (raw) => {
+    if (raw == null || raw === '') return '—';
+    const s = String(raw).trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+      return new Date(`${s}T12:00:00`).toLocaleDateString('en-PK', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      });
+    }
+    const d = new Date(s);
+    return Number.isNaN(d.getTime())
+      ? '—'
+      : d.toLocaleDateString('en-PK', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric'
+        });
+  };
+
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[100] p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden max-h-screen overflow-y-auto">
 
         {/* Header */}
@@ -57,11 +77,7 @@ const AppointmentReceipt = ({ data, onClose }) => {
 <div className="flex justify-between py-2 border-b border-gray-50">
   <span className="text-sm text-gray-500">Appointment Date</span>
   <span className="text-sm font-semibold text-gray-700">
-    {new Date(data.appointmentDate + 'T00:00:00').toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    })}
+    {formatApptDate(data.appointmentDate)}
   </span>
 </div>
           <div className="flex justify-between py-2 border-b border-gray-50">

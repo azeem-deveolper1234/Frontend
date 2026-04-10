@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import AppointmentReceipt from '../components/AppointmentReceipt';
 import { useAuth } from '../context/AuthContext';
 import socket from '../services/socket';
@@ -29,6 +29,12 @@ const [showGateway, setShowGateway] = useState(false);
 const [gatewayStep, setGatewayStep] = useState('phone'); // phone, otp, processing, success
 const [gatewayPhone, setGatewayPhone] = useState('');
 const [gatewayOtp, setGatewayOtp] = useState('');
+const pendingBookingRef = useRef(null);
+const gatewayTimersRef = useRef([]);
+const clearGatewayTimers = () => {
+  gatewayTimersRef.current.forEach((id) => clearTimeout(id));
+  gatewayTimersRef.current = [];
+};
 
 const [payments, setPayments] = useState([]);
 const [paymentForm, setPaymentForm] = useState({
@@ -75,6 +81,7 @@ useEffect(() => {
 
   return () => {
     clearInterval(interval);
+    clearGatewayTimers();
     socket.off('queueUpdated');
     socket.off('queueCompleted');
     socket.off('queueCancelled');
@@ -122,70 +129,66 @@ useEffect(() => {
       setReports(res.data.reports);
     } catch (err) {}
   };
-const processJoinQueue = async () => {
-  console.log("doctors:", doctors);
-console.log("serviceName:", joinForm.serviceName);
-const doctorObj = doctors.find(d => d.name === joinForm.serviceName);
-console.log("doctorObj:", doctorObj);
+
+const processJoinQueue = async (formSnapshot) => {
+  const form = formSnapshot || joinForm;
+  const doctorObj = doctors.find((d) => d.name === form.serviceName);
   setLoading(true);
   setError('');
   setMessage('');
-  const bookingTime = new Date();
   try {
-    // Step 1: Queue join karo
     const queueRes = await joinQueue({
-      serviceName: joinForm.serviceName,
-      priority: joinForm.priority,
-      appointmentDate: joinForm.appointmentDate,
-      notes: joinForm.notes
+      serviceName: form.serviceName,
+      priority: form.priority,
+      appointmentDate: form.appointmentDate,
+      notes: form.notes
     });
 
     const newQueueId = queueRes.data._id;
-    
+    const fee =
+      Number(form.totalAmount) ||
+      (doctorObj && Number(doctorObj.consultationFee)) ||
+      1000;
 
-    // Step 2: Payment karo
- if (newQueueId && doctorObj) {
+    if (newQueueId && doctorObj) {
+      try {
+        const pm = form.paymentMethod;
+        const isWallet = pm === 'easypaisa' || pm === 'jazzcash';
+        await createPayment({
+          queueId: newQueueId,
+          doctorId: doctorObj._id,
+          totalAmount: fee,
+          paymentMethod: isWallet ? 'online' : pm,
+          ...(isWallet ? { walletChannel: pm } : {})
+        });
+      } catch (payErr) {
+        try {
+          await cancelQueue();
+        } catch (_) {
+          /* queue cancel optional */
+        }
+        throw payErr;
+      }
+    }
 
-   console.log("Payment create ho rahi hai:", {
-    queueId: newQueueId,
-    doctorId: doctorObj._id,
-    totalAmount: joinForm.totalAmount,
-  });
-  await createPayment({
-    queueId: newQueueId,
-    doctorId: doctorObj._id,
-    totalAmount: joinForm.totalAmount || doctorObj.consultationFee || 1000,
-    paymentMethod: joinForm.paymentMethod
-  });
-}
-
-    // Step 3: Receipt dikhao
-  const bookingTime = new Date();
-
-setReceiptData({
-  tokenNumber: queueRes.data.tokenNumber,
-  patientName: user.name,
-  email: user.email,
-  phone: user.phone || '',
-  doctorName: joinForm.serviceName,
-
-  // ✅ FIXED DATE (no timezone issue)
-  appointmentDate: joinForm.appointmentDate,
-
-  // ✅ booking time (perfect)
-  bookingTime: bookingTime.toLocaleString('en-PK', {
-    dateStyle: 'medium',
-    timeStyle: 'short'
-  }),
-
-  priority: joinForm.priority,
-  notes: joinForm.notes,
-  totalAmount: doctorObj ? doctorObj.consultationFee : null,
-});
-  
+    const bookedAt = new Date();
+    setReceiptData({
+      tokenNumber: queueRes.data.tokenNumber,
+      patientName: user.name,
+      email: user.email,
+      phone: user.phone || '',
+      doctorName: form.serviceName,
+      appointmentDate: form.appointmentDate,
+      bookingTime: bookedAt.toLocaleString('en-PK', {
+        dateStyle: 'medium',
+        timeStyle: 'short'
+      }),
+      priority: form.priority,
+      notes: form.notes,
+      totalAmount: doctorObj ? Number(doctorObj.consultationFee) || fee : fee
+    });
 
     setShowReceipt(true);
-
     fetchQueueStatus();
     setActiveTab('home');
     setJoinForm({
@@ -196,23 +199,56 @@ setReceiptData({
       totalAmount: '',
       paymentMethod: 'cash'
     });
-
   } catch (err) {
-    setError(err.response?.data?.message || 'Booking failed');
+    const apiMsg = err.response?.data?.message;
+    setError(
+      typeof apiMsg === 'string'
+        ? apiMsg
+        : apiMsg?.message || err.message || 'Booking failed'
+    );
+    fetchQueueStatus();
+  } finally {
+    pendingBookingRef.current = null;
+    setLoading(false);
+    setShowGateway(false);
+    setGatewayStep('phone');
+    setGatewayPhone('');
+    setGatewayOtp('');
+    clearGatewayTimers();
   }
-  setLoading(false);
 };
 
-// Naya interceptor jo mock gateway check karta hai
-const handleJoinQueue = (e) => {
+const handleJoinQueue = async (e) => {
   e.preventDefault();
-  if (joinForm.paymentMethod === 'easypaisa' || joinForm.paymentMethod === 'jazzcash' || joinForm.paymentMethod === 'card') {
+  setError('');
+  try {
+    await getQueueStatus();
+    setError(
+      'Aap pehle se active queue mein hain. Naya appointment ke liye Home se queue cancel karein ya apna turn complete hone dein.'
+    );
+    return;
+  } catch (err) {
+    if (err.response?.status !== 404) {
+      setError(err.response?.data?.message || 'Status check failed');
+      return;
+    }
+  }
+
+  const snapshot = { ...joinForm };
+  pendingBookingRef.current = snapshot;
+
+  if (
+    joinForm.paymentMethod === 'easypaisa' ||
+    joinForm.paymentMethod === 'jazzcash' ||
+    joinForm.paymentMethod === 'card'
+  ) {
+    clearGatewayTimers();
     setGatewayStep('phone');
     setGatewayPhone('');
     setGatewayOtp('');
     setShowGateway(true);
   } else {
-    processJoinQueue();
+    await processJoinQueue(snapshot);
   }
 };
 
@@ -224,17 +260,25 @@ const handleGatewayNext = () => {
   } else if (gatewayStep === 'otp') {
     if (gatewayOtp.length < 4) return setError('4-digit OTP laazmi hai');
     setError('');
+    const locked =
+      pendingBookingRef.current && pendingBookingRef.current.serviceName
+        ? { ...pendingBookingRef.current }
+        : { ...joinForm };
+    if (!locked.serviceName || !locked.appointmentDate) {
+      setError('Doctor aur appointment date zaroori hain — form dubara check karein.');
+      return;
+    }
     setGatewayStep('processing');
-    
-    // Simulate processing delay
-    setTimeout(() => {
+    clearGatewayTimers();
+
+    const t1 = setTimeout(() => {
       setGatewayStep('success');
-      // Thori der baad close ho kar queue api trigger hoga
-      setTimeout(() => {
-        setShowGateway(false);
-        processJoinQueue();
+      const t2 = setTimeout(() => {
+        processJoinQueue(locked);
       }, 1500);
+      gatewayTimersRef.current.push(t2);
     }, 2000);
+    gatewayTimersRef.current.push(t1);
   }
 };
   const handleCancelQueue = async () => {
@@ -263,6 +307,7 @@ const handleGatewayNext = () => {
 
 {showReceipt && receiptData && (
   <AppointmentReceipt
+    key={`${receiptData.tokenNumber}-${receiptData.bookingTime}`}
     data={receiptData}
     onClose={() => setShowReceipt(false)}
   />
@@ -308,7 +353,18 @@ const handleGatewayNext = () => {
             >
               Continue
             </button>
-            <button onClick={() => setShowGateway(false)} className="w-full text-center text-gray-400 text-sm mt-3 hover:text-gray-600 transition">Cancel</button>
+            <button
+              type="button"
+              onClick={() => {
+                clearGatewayTimers();
+                pendingBookingRef.current = null;
+                setShowGateway(false);
+                setGatewayStep('phone');
+              }}
+              className="w-full text-center text-gray-400 text-sm mt-3 hover:text-gray-600 transition"
+            >
+              Cancel
+            </button>
           </div>
         )}
 
