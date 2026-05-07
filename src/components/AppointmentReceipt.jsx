@@ -107,6 +107,17 @@ const AppointmentReceipt = ({ data, onClose }) => {
 {data.totalAmount && (
   <div className="mx-6 mb-4 bg-green-50 rounded-xl p-4 border-l-4 border-green-500">
     <div className="text-xs text-gray-400 uppercase tracking-widest mb-3">Payment Summary</div>
+    {data.paymentMethodLabel && (
+      <div className="flex justify-between py-1 border-b border-dashed border-green-200 mb-2 pb-2">
+        <span className="text-sm text-gray-500">Paid via</span>
+        <span className="text-sm font-semibold text-gray-800">
+          {data.paymentMethodLabel}
+          {data.paidViaLastDigits ? (
+            <span className="text-green-700"> • ****{data.paidViaLastDigits}</span>
+          ) : null}
+        </span>
+      </div>
+    )}
     <div className="flex justify-between py-1">
       <span className="text-sm text-gray-500">Consultation Fee</span>
       <span className="text-sm font-semibold">Rs. {data.totalAmount}</span>

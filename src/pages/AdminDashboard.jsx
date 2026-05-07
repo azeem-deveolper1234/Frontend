@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { 
@@ -16,8 +16,54 @@ import {
   addDoctor,
   updateDoctor,
   deleteDoctor,
-  clearOldData
+  clearOldData,
+  getPatientClinicHistory
 } from '../services/api';
+
+function describeAdvancePayment(p) {
+  if (!p) return '—';
+  if (p.walletChannel === 'easypaisa') return 'Easypaisa (advance)';
+  if (p.walletChannel === 'jazzcash') return 'JazzCash (advance)';
+  if (p.paymentMethod === 'card') return 'Debit/credit card (advance)';
+  if (p.paymentMethod === 'cash') return 'Cash (advance)';
+  if (p.paymentMethod === 'online') return 'Online (advance)';
+  return p.paymentMethod || '—';
+}
+
+function describeFinalSettlement(p) {
+  if (!p || p.finalStatus !== 'paid') return null;
+  if (p.finalSettlementWallet === 'easypaisa') return 'Easypaisa (remaining)';
+  if (p.finalSettlementWallet === 'jazzcash') return 'JazzCash (remaining)';
+  if (p.finalSettlementMethod === 'card') return 'Debit/credit card (remaining)';
+  if (p.finalSettlementMethod === 'cash') return 'Cash (remaining)';
+  if (p.finalSettlementMethod === 'online') return 'Online (remaining)';
+  if (p.paymentMethod === 'cash') return 'Cash (remaining)';
+  if (p.paymentMethod === 'online') return 'Online (remaining)';
+  return p.paymentMethod ? `${p.paymentMethod} (remaining)` : '—';
+}
+
+function formatHistoryDate(d) {
+  if (d == null) return '—';
+  const x = new Date(d);
+  return Number.isNaN(x.getTime())
+    ? '—'
+    : x.toLocaleString('en-PK', { dateStyle: 'medium', timeStyle: 'short' });
+}
+
+function formatHistoryDay(d) {
+  if (d == null) return '—';
+  const x = new Date(d);
+  return Number.isNaN(x.getTime())
+    ? '—'
+    : x.toLocaleDateString('en-PK', { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
+function visitStatusLabel(s) {
+  if (s === 'completed') return { text: 'Completed', cls: 'bg-green-100 text-green-800' };
+  if (s === 'cancelled') return { text: 'Cancelled', cls: 'bg-red-100 text-red-800' };
+  if (s === 'serving') return { text: 'Serving', cls: 'bg-blue-100 text-blue-800' };
+  return { text: 'Waiting', cls: 'bg-amber-100 text-amber-900' };
+}
 
 const AdminDashboard = () => {  
     const { user, logoutUser } = useAuth();
@@ -50,6 +96,27 @@ const [doctorForm, setDoctorForm] = useState({
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [historyUserId, setHistoryUserId] = useState('');
+  const [patientHistoryData, setPatientHistoryData] = useState(null);
+  const [patientHistoryLoading, setPatientHistoryLoading] = useState(false);
+  /** Remaining payment — Easypaisa / JazzCash / card: same mock flow as patient dashboard */
+  const [showFinalPayGateway, setShowFinalPayGateway] = useState(false);
+  const [finalPayStep, setFinalPayStep] = useState('phone');
+  const [finalPayPhone, setFinalPayPhone] = useState('');
+  const [finalPayOtp, setFinalPayOtp] = useState('');
+  const [finalPayMeta, setFinalPayMeta] = useState({
+    method: 'card',
+    amount: 0,
+    patientName: ''
+  });
+  const finalPayContextRef = useRef(null);
+  const finalPayTimersRef = useRef([]);
+
+  const clearFinalPayTimers = () => {
+    finalPayTimersRef.current.forEach((id) => clearTimeout(id));
+    finalPayTimersRef.current = [];
+  };
+
   const [serviceName, setServiceName] = useState('General Doctor');
   const [tokenNumber, setTokenNumber] = useState('');
   const [reportForm, setReportForm] = useState({
@@ -72,6 +139,10 @@ useEffect(() => {
   fetchOverallStats();
   fetchDoctors(); // 👈 add karo
 }, []);
+
+  useEffect(() => {
+    return () => clearFinalPayTimers();
+  }, []);
 
  const fetchTodayStats = async () => {
   try {
@@ -159,8 +230,7 @@ const handleFinalPayment = async (tokenNum) => {
     const paymentRes = await getQueuePayment(queueRes.data._id);
     if (!paymentRes.data) return setError('Payment record nahi mila!');
     
-    // Final payment complete karo
-    await completeFinalPayment(paymentRes.data._id);
+    await completeFinalPayment(paymentRes.data._id, { method: 'cash' });
     setMessage(`✅ Final payment complete! Token: ${tokenNum}`);
     fetchPayments();
   } catch (err) {
@@ -202,16 +272,40 @@ const handleFinalPayment = async (tokenNum) => {
     setReportForm({ ...reportForm, prescription: updated });
   };
 
+  const loadPatientHistory = async (userId) => {
+    if (!userId) {
+      setPatientHistoryData(null);
+      return;
+    }
+    setPatientHistoryLoading(true);
+    setError('');
+    try {
+      const res = await getPatientClinicHistory(userId);
+      setPatientHistoryData(res.data);
+    } catch (err) {
+      setPatientHistoryData(null);
+      setError(err.response?.data?.message || 'History load failed');
+    } finally {
+      setPatientHistoryLoading(false);
+    }
+  };
+
   const handleTabChange = (tab) => {
     setActiveTab(tab);
     setMessage('');
     setError('');
     if (tab === 'payments') fetchPayments();
     if (tab === 'doctors') fetchDoctors();
-if (tab === 'reports') {
-  fetchUsers();
-  fetchDoctors();
-}  };
+    if (tab === 'reports') {
+      fetchUsers();
+      fetchDoctors();
+    }
+    if (tab === 'patientHistory') {
+      fetchUsers();
+      setHistoryUserId('');
+      setPatientHistoryData(null);
+    }
+  };
 
  
 
@@ -228,11 +322,20 @@ const handlePatientChange = async (patientId) => {
 };
 
   const handleClearOldData = async () => {
-    if (!window.confirm("Kaya aap waqayi 2 hafte purana data delete karna chahte hain? Yeh database se clear ho jayega.")) return;
+    if (
+      !window.confirm(
+        'Poorana queue data delete karein? (Pehle se zyada purani createdAt ya appointmentDate wali rows — waiting/serving bhi agar purani appointment ho.)'
+      )
+    ) {
+      return;
+    }
     setLoading(true);
+    setError('');
     try {
       const res = await clearOldData({ days: 14 });
-      setMessage('✅ ' + res.data.message);
+      const base = res.data?.message || 'Done';
+      const hint = res.data?.hint;
+      setMessage(hint ? `✅ ${base}\n\n${hint}` : `✅ ${base}`);
       fetchTodayStats();
       fetchOverallStats();
     } catch (err) {
@@ -241,8 +344,264 @@ const handlePatientChange = async (patientId) => {
     setLoading(false);
   };
 
+  const openFinalPaymentGateway = (payment, method) => {
+    setError('');
+    clearFinalPayTimers();
+    finalPayContextRef.current = {
+      paymentId: payment._id,
+      method
+    };
+    setFinalPayMeta({
+      method,
+      amount: Number(payment.remainingAmount) || 0,
+      patientName: payment.user?.name || 'Patient'
+    });
+    setFinalPayStep('phone');
+    setFinalPayPhone('');
+    setFinalPayOtp('');
+    setShowFinalPayGateway(true);
+  };
+
+  const closeFinalPaymentGateway = () => {
+    clearFinalPayTimers();
+    finalPayContextRef.current = null;
+    setShowFinalPayGateway(false);
+    setFinalPayStep('phone');
+    setFinalPayPhone('');
+    setFinalPayOtp('');
+    setError('');
+  };
+
+  const handleFinalPayGatewayNext = () => {
+    const ctx = finalPayContextRef.current;
+    if (!ctx?.paymentId) return;
+
+    if (finalPayStep === 'phone') {
+      if (!String(finalPayPhone).trim()) {
+        setError(
+          finalPayMeta.method === 'card'
+            ? 'Card number enter karein.'
+            : 'Mobile number enter karein.'
+        );
+        return;
+      }
+      setError('');
+      setFinalPayStep('otp');
+      return;
+    }
+
+    if (finalPayStep === 'otp') {
+      if (finalPayOtp.length < 4) {
+        setError('4-digit OTP zaroori hai.');
+        return;
+      }
+      setError('');
+      setFinalPayStep('processing');
+      clearFinalPayTimers();
+
+      const t1 = setTimeout(() => {
+        setFinalPayStep('success');
+        const t2 = setTimeout(async () => {
+          try {
+            await completeFinalPayment(ctx.paymentId, { method: ctx.method });
+            setMessage(
+              `✅ Remaining Rs. ${finalPayMeta.amount} — ${ctx.method} — ${finalPayMeta.patientName}`
+            );
+            fetchPayments();
+          } catch (err) {
+            setError(err.response?.data?.message || 'Payment failed');
+          } finally {
+            finalPayContextRef.current = null;
+            clearFinalPayTimers();
+            setShowFinalPayGateway(false);
+            setFinalPayStep('phone');
+            setFinalPayPhone('');
+            setFinalPayOtp('');
+          }
+        }, 1200);
+        finalPayTimersRef.current.push(t2);
+      }, 1800);
+      finalPayTimersRef.current.push(t1);
+    }
+  };
+
+  const fpMethod = finalPayMeta.method;
+
   return (
     <div className="min-h-screen bg-gray-50">
+
+      {showFinalPayGateway && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/70 backdrop-blur-sm p-4">
+          <div
+            className={`bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden border-t-4 ${
+              fpMethod === 'easypaisa'
+                ? 'border-emerald-500'
+                : fpMethod === 'jazzcash'
+                  ? 'border-red-600'
+                  : 'border-blue-600'
+            }`}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="admin-pay-title"
+          >
+            <div
+              className={`px-6 py-5 text-center text-white ${
+                fpMethod === 'easypaisa'
+                  ? 'bg-gradient-to-br from-emerald-500 to-emerald-700'
+                  : fpMethod === 'jazzcash'
+                    ? 'bg-gradient-to-br from-red-600 to-red-800'
+                    : 'bg-gradient-to-br from-blue-600 to-indigo-800'
+              }`}
+            >
+              <p className="text-[10px] uppercase tracking-[0.2em] text-white/70 mb-1">
+                Admin virtual terminal
+              </p>
+              <h2 id="admin-pay-title" className="text-2xl font-extrabold tracking-tight">
+                {fpMethod === 'easypaisa'
+                  ? 'Easypaisa'
+                  : fpMethod === 'jazzcash'
+                    ? 'JazzCash'
+                    : 'Debit / credit card'}
+              </h2>
+              <p className="text-sm text-white/85 mt-1">
+                Remaining balance — {finalPayMeta.patientName}
+              </p>
+              <p className="text-xs text-white/70 mt-2">
+                Demo checkout (same flow as patient app)
+              </p>
+            </div>
+
+            <div className="p-6">
+              {finalPayStep === 'phone' && (
+                <div className="space-y-4">
+                  <p className="text-center text-slate-600 text-sm">
+                    Amount to collect
+                    <span className="block text-2xl font-bold text-slate-900 mt-1">
+                      Rs. {finalPayMeta.amount}
+                    </span>
+                  </p>
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-2">
+                      {fpMethod === 'card' ? 'Card number' : 'Wallet mobile number'}
+                    </label>
+                    <input
+                      type={fpMethod === 'card' ? 'text' : 'tel'}
+                      className="w-full bg-slate-50 border border-slate-200 px-4 py-3 rounded-xl text-lg font-mono placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-inner"
+                      placeholder={fpMethod === 'card' ? '4111 1111 1111 1111' : '03XX XXXXXXX'}
+                      value={finalPayPhone}
+                      onChange={(e) => setFinalPayPhone(e.target.value)}
+                      autoFocus
+                    />
+                  </div>
+                  {error && (
+                    <p className="text-red-600 text-xs font-semibold text-center">{error}</p>
+                  )}
+                  <button
+                    type="button"
+                    onClick={handleFinalPayGatewayNext}
+                    className={`w-full py-3 rounded-xl text-white font-bold shadow-md transition hover:opacity-95 active:scale-[0.99] ${
+                      fpMethod === 'easypaisa'
+                        ? 'bg-emerald-600'
+                        : fpMethod === 'jazzcash'
+                          ? 'bg-red-600'
+                          : 'bg-blue-600'
+                    }`}
+                  >
+                    Continue
+                  </button>
+                  <button
+                    type="button"
+                    onClick={closeFinalPaymentGateway}
+                    className="w-full text-center text-slate-400 text-sm py-2 hover:text-slate-600"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              )}
+
+              {finalPayStep === 'otp' && (
+                <div className="space-y-4 text-center">
+                  <div className="w-14 h-14 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mx-auto shadow-sm text-2xl">
+                    💬
+                  </div>
+                  <p className="text-slate-600 text-sm">
+                    4-digit code sent to
+                    <br />
+                    <strong className="text-slate-900">{finalPayPhone}</strong>
+                  </p>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={4}
+                    className="w-36 mx-auto block bg-slate-50 border border-slate-200 px-4 py-3 rounded-xl text-2xl font-bold tracking-[0.4em] text-center focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-inner"
+                    placeholder="••••"
+                    value={finalPayOtp}
+                    onChange={(e) => setFinalPayOtp(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                    autoFocus
+                  />
+                  {error && (
+                    <p className="text-red-600 text-xs font-semibold">{error}</p>
+                  )}
+                  <button
+                    type="button"
+                    onClick={handleFinalPayGatewayNext}
+                    className="w-full bg-slate-900 text-white py-3 rounded-xl font-bold shadow-md hover:bg-black transition"
+                  >
+                    Verify & collect
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setError('');
+                      setFinalPayStep('phone');
+                    }}
+                    className="w-full text-slate-400 text-sm py-2 hover:text-slate-600"
+                  >
+                    Back
+                  </button>
+                </div>
+              )}
+
+              {finalPayStep === 'processing' && (
+                <div className="py-10 text-center">
+                  <div className="inline-block relative w-20 h-20 mb-4">
+                    <div
+                      className={`absolute inset-0 rounded-full border-4 border-t-transparent animate-spin ${
+                        fpMethod === 'easypaisa'
+                          ? 'border-emerald-500'
+                          : fpMethod === 'jazzcash'
+                            ? 'border-red-500'
+                            : 'border-blue-500'
+                      }`}
+                    />
+                    <div className="absolute inset-0 flex items-center justify-center text-2xl">🔒</div>
+                  </div>
+                  <h3 className="text-lg font-bold text-slate-800">Processing…</h3>
+                  <p className="text-slate-400 text-sm mt-1">Do not close this window</p>
+                </div>
+              )}
+
+              {finalPayStep === 'success' && (
+                <div className="py-10 text-center">
+                  <div
+                    className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 text-4xl shadow-lg ${
+                      fpMethod === 'easypaisa'
+                        ? 'bg-emerald-100 text-emerald-600'
+                        : fpMethod === 'jazzcash'
+                          ? 'bg-red-100 text-red-600'
+                          : 'bg-blue-100 text-blue-600'
+                    }`}
+                  >
+                    ✓
+                  </div>
+                  <h3 className="text-xl font-extrabold text-slate-800">Successful</h3>
+                  <p className="text-slate-500 text-sm mt-1">Recording payment…</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Navbar */}
       <nav className="bg-gradient-to-r from-blue-900 to-blue-700 shadow-lg">
@@ -275,6 +634,7 @@ const handlePatientChange = async (patientId) => {
 { id: 'doctors', label: '👨‍⚕️ Doctors' },
 { id: 'reports', label: '🏥 Medical Reports' },
 { id: 'payments', label: '💰 Payments' },
+              { id: 'patientHistory', label: '📜 Patient history' },
             ].map(tab => (
               <button
                 key={tab.id}
@@ -294,7 +654,11 @@ const handlePatientChange = async (patientId) => {
 
       <div className="max-w-7xl mx-auto px-4 py-8">
 
-        {message && <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg mb-6">{message}</div>}
+        {message && (
+          <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg mb-6 whitespace-pre-line text-sm leading-relaxed">
+            {message}
+          </div>
+        )}
         {error && <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg mb-6">⚠️ {error}</div>}
 
         {/* DASHBOARD TAB */}
@@ -789,7 +1153,10 @@ const handlePatientChange = async (patientId) => {
                         <p className="text-gray-500 text-sm">📞 {payment.user?.phone || 'N/A'}</p>
                         <p className="text-blue-600 text-sm font-semibold mt-1">👨‍⚕️ {payment.doctor?.name}</p>
                         <p className="text-gray-500 text-xs mt-1">📅 {new Date(payment.createdAt).toLocaleDateString()}</p>
-                        <p className="text-gray-500 text-xs">💳 Method: {payment.paymentMethod}</p>
+                        <p className="text-gray-500 text-xs">💳 Advance: {describeAdvancePayment(payment)}</p>
+                        {payment.finalStatus === 'paid' && (
+                          <p className="text-gray-500 text-xs">✅ Remaining: {describeFinalSettlement(payment)}</p>
+                        )}
                       </div>
                       <div className="text-right space-y-1">
                         <p className="font-bold text-gray-800 text-lg">Rs. {payment.totalAmount}</p>
@@ -804,43 +1171,280 @@ const handlePatientChange = async (patientId) => {
                            payment.advanceStatus === 'cancelled' ? '❌ Cancelled' : '⏳ Advance Paid'}
                         </span>
                         {payment.finalStatus !== 'paid' && payment.advanceStatus !== 'cancelled' && (
-                          <div className="flex space-x-2 mt-2">
-  <button
-    onClick={async () => {
-      try {
-        await completeFinalPayment(payment._id, { method: 'cash' });
-        setMessage(`✅ Cash payment received — ${payment.user?.name}`);
-        fetchPayments();
-      } catch (err) {
-        setError('Payment failed');
-      }
-    }}
-    className="flex-1 bg-green-500 hover:bg-green-600 text-white px-3 py-2 rounded-lg text-sm font-semibold transition"
-  >
-    💵 Cash
-  </button>
-
-  <button
-    onClick={async () => {
-      try {
-        await completeFinalPayment(payment._id, { method: 'online' });
-        setMessage(`✅ Online payment received — ${payment.user?.name}`);
-        fetchPayments();
-      } catch (err) {
-        setError('Payment failed');
-      }
-    }}
-    className="flex-1 bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded-lg text-sm font-semibold transition"
-  >
-    💳 Online
-  </button>
-</div>
+                          <div className="mt-2 space-y-2">
+                            <p className="text-xs text-gray-500 font-medium">Collect remaining (Rs. {payment.remainingAmount})</p>
+                            <div className="flex flex-wrap gap-2 justify-end">
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  try {
+                                    await completeFinalPayment(payment._id, { method: 'cash' });
+                                    setMessage(`✅ Remaining — cash — ${payment.user?.name}`);
+                                    fetchPayments();
+                                  } catch (err) {
+                                    setError(err.response?.data?.message || 'Payment failed');
+                                  }
+                                }}
+                                className="bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-lg text-xs font-semibold transition"
+                              >
+                                💵 Cash
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => openFinalPaymentGateway(payment, 'easypaisa')}
+                                className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-lg text-xs font-semibold transition"
+                              >
+                                Easypaisa
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => openFinalPaymentGateway(payment, 'jazzcash')}
+                                className="bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded-lg text-xs font-semibold transition"
+                              >
+                                JazzCash
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => openFinalPaymentGateway(payment, 'card')}
+                                className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg text-xs font-semibold transition"
+                              >
+                                💳 Debit / credit
+                              </button>
+                            </div>
+                          </div>
                         )}
                       </div>
                     </div>
                   </div>
                 ))}
               </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'patientHistory' && (
+          <div className="max-w-5xl mx-auto space-y-8">
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900">Patient visit history</h2>
+              <p className="text-gray-500 text-sm mt-1 max-w-2xl">
+                Pehli dafa ya doosri dafa aane par doctor / admin yahan se dekh sakta hai: kab appointment
+                thi, kis doctor/clinic service par token aya, status kya raha, aur agar checkup report bani
+                ho to diagnosis / vitals — taake agli visit par purana record samajh aa sake.
+              </p>
+            </div>
+
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Patient select karein
+              </label>
+              <select
+                value={historyUserId}
+                onChange={(e) => {
+                  const id = e.target.value;
+                  setHistoryUserId(id);
+                  loadPatientHistory(id);
+                }}
+                className="w-full max-w-xl px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50"
+              >
+                <option value="">-- Patient choose karein --</option>
+                {users.map((u) => (
+                  <option key={u._id} value={u._id}>
+                    {u.name} — {u.email}
+                    {u.phone ? ` — ${u.phone}` : ''}
+                  </option>
+                ))}
+              </select>
+              {patientHistoryLoading && (
+                <p className="text-blue-600 text-sm mt-3 font-medium">⏳ Loading history…</p>
+              )}
+            </div>
+
+            {patientHistoryData && !patientHistoryLoading && (
+              <>
+                <div className="bg-gradient-to-r from-slate-800 to-slate-700 rounded-2xl p-6 text-white shadow-lg">
+                  <p className="text-xs uppercase tracking-widest text-white/60">Selected patient</p>
+                  <h3 className="text-2xl font-bold mt-1">{patientHistoryData.patient?.name}</h3>
+                  <p className="text-white/85 text-sm mt-1">{patientHistoryData.patient?.email}</p>
+                  <p className="text-white/70 text-sm">
+                    Phone: {patientHistoryData.patient?.phone || 'N/A'}
+                  </p>
+                  <div className="flex flex-wrap gap-4 mt-4 text-sm">
+                    <span className="bg-white/10 rounded-lg px-3 py-1">
+                      Visits (queue): <strong>{patientHistoryData.totalVisits}</strong>
+                    </span>
+                    <span className="bg-white/10 rounded-lg px-3 py-1">
+                      Checkup reports: <strong>{patientHistoryData.totalReports}</strong>
+                    </span>
+                    <span className="bg-white/10 rounded-lg px-3 py-1">
+                      Payments: <strong>{patientHistoryData.totalPayments}</strong>
+                    </span>
+                  </div>
+                </div>
+
+                <section>
+                  <h4 className="text-lg font-bold text-gray-800 mb-3 flex items-center gap-2">
+                    <span className="text-xl">📅</span> Appointments (queue)
+                  </h4>
+                  {patientHistoryData.visits?.length === 0 ? (
+                    <p className="text-gray-500 text-sm bg-gray-50 rounded-xl p-4 border border-gray-100">
+                      Abhi koi queue / appointment record nahi.
+                    </p>
+                  ) : (
+                    <div className="overflow-x-auto rounded-xl border border-gray-200 shadow-sm">
+                      <table className="min-w-full text-sm">
+                        <thead className="bg-gray-50 text-gray-600 text-left">
+                          <tr>
+                            <th className="px-4 py-3 font-semibold">Appointment date</th>
+                            <th className="px-4 py-3 font-semibold">Doctor / service</th>
+                            <th className="px-4 py-3 font-semibold">Token</th>
+                            <th className="px-4 py-3 font-semibold">Status</th>
+                            <th className="px-4 py-3 font-semibold">Booked</th>
+                            <th className="px-4 py-3 font-semibold">Notes</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100 bg-white">
+                          {patientHistoryData.visits.map((v) => {
+                            const st = visitStatusLabel(v.status);
+                            return (
+                              <tr key={v._id} className="hover:bg-gray-50/80">
+                                <td className="px-4 py-3 text-gray-800 whitespace-nowrap">
+                                  {formatHistoryDay(v.appointmentDate)}
+                                </td>
+                                <td className="px-4 py-3 font-medium text-blue-800">{v.serviceName}</td>
+                                <td className="px-4 py-3 font-mono">#{v.tokenNumber}</td>
+                                <td className="px-4 py-3">
+                                  <span className={`text-xs font-semibold px-2 py-1 rounded-full ${st.cls}`}>
+                                    {st.text}
+                                  </span>
+                                </td>
+                                <td className="px-4 py-3 text-gray-500 whitespace-nowrap">
+                                  {formatHistoryDate(v.createdAt)}
+                                </td>
+                                <td className="px-4 py-3 text-gray-600 max-w-xs truncate" title={v.notes || ''}>
+                                  {v.notes || '—'}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </section>
+
+                <section>
+                  <h4 className="text-lg font-bold text-gray-800 mb-3 flex items-center gap-2">
+                    <span className="text-xl">🏥</span> Checkups (medical reports)
+                  </h4>
+                  {patientHistoryData.reports?.length === 0 ? (
+                    <p className="text-gray-500 text-sm bg-gray-50 rounded-xl p-4 border border-gray-100">
+                      Koi medical report abhi file nahi — jab admin report banaye ga yahan dikhe ga.
+                    </p>
+                  ) : (
+                    <div className="space-y-4">
+                      {patientHistoryData.reports.map((r) => (
+                        <div
+                          key={r._id}
+                          className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm hover:border-blue-200 transition"
+                        >
+                          <div className="flex flex-wrap justify-between gap-2 border-b border-gray-100 pb-3 mb-3">
+                            <div>
+                              <p className="text-xs text-gray-400 uppercase tracking-wide">Checkup date</p>
+                              <p className="font-semibold text-gray-900">{formatHistoryDate(r.createdAt)}</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-xs text-gray-400 uppercase tracking-wide">Doctor</p>
+                              <p className="font-semibold text-blue-800">
+                                {r.doctor?.name || '—'}{' '}
+                                <span className="text-gray-500 font-normal text-sm">
+                                  {r.doctor?.specialization ? `(${r.doctor.specialization})` : ''}
+                                </span>
+                              </p>
+                            </div>
+                          </div>
+                          <p className="text-sm text-gray-700">
+                            <span className="font-semibold text-gray-800">Diagnosis: </span>
+                            {r.diagnosis}
+                          </p>
+                          {r.symptoms ? (
+                            <p className="text-sm text-gray-600 mt-2">
+                              <span className="font-medium">Symptoms: </span>
+                              {r.symptoms}
+                            </p>
+                          ) : null}
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-3 text-xs text-gray-600">
+                            {r.bloodPressure ? <span>BP: {r.bloodPressure}</span> : null}
+                            {r.temperature ? <span>Temp: {r.temperature}</span> : null}
+                            {r.weight ? <span>Weight: {r.weight}</span> : null}
+                            {r.queue?.tokenNumber != null ? (
+                              <span>
+                                Token: #{r.queue.tokenNumber} — {r.queue?.serviceName || ''}
+                              </span>
+                            ) : null}
+                          </div>
+                          {r.doctorNotes ? (
+                            <p className="text-xs text-gray-500 mt-3 border-t border-dashed pt-2">
+                              <span className="font-medium text-gray-600">Doctor notes: </span>
+                              {r.doctorNotes}
+                            </p>
+                          ) : null}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </section>
+
+                <section>
+                  <h4 className="text-lg font-bold text-gray-800 mb-3 flex items-center gap-2">
+                    <span className="text-xl">💳</span> Payments (advance / remaining)
+                  </h4>
+                  {patientHistoryData.payments?.length === 0 ? (
+                    <p className="text-gray-500 text-sm bg-gray-50 rounded-xl p-4 border border-gray-100">
+                      Koi payment record nahi.
+                    </p>
+                  ) : (
+                    <div className="overflow-x-auto rounded-xl border border-gray-200 shadow-sm">
+                      <table className="min-w-full text-sm">
+                        <thead className="bg-gray-50 text-gray-600 text-left">
+                          <tr>
+                            <th className="px-4 py-3 font-semibold">Date</th>
+                            <th className="px-4 py-3 font-semibold">Doctor</th>
+                            <th className="px-4 py-3 font-semibold">Total</th>
+                            <th className="px-4 py-3 font-semibold">Advance</th>
+                            <th className="px-4 py-3 font-semibold">Remaining</th>
+                            <th className="px-4 py-3 font-semibold">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100 bg-white">
+                          {patientHistoryData.payments.map((p) => (
+                            <tr key={p._id} className="hover:bg-gray-50/80">
+                              <td className="px-4 py-3 whitespace-nowrap text-gray-600">
+                                {formatHistoryDate(p.createdAt)}
+                              </td>
+                              <td className="px-4 py-3 text-blue-800 font-medium">
+                                {p.doctor?.name || '—'}
+                              </td>
+                              <td className="px-4 py-3">Rs. {p.totalAmount}</td>
+                              <td className="px-4 py-3 text-green-700">Rs. {p.advanceAmount}</td>
+                              <td className="px-4 py-3 text-orange-600">Rs. {p.remainingAmount}</td>
+                              <td className="px-4 py-3 text-xs">
+                                <div>{describeAdvancePayment(p)}</div>
+                                {p.finalStatus === 'paid' ? (
+                                  <div className="text-green-700 mt-0.5">
+                                    Final: {describeFinalSettlement(p)}
+                                  </div>
+                                ) : (
+                                  <div className="text-amber-700 mt-0.5">Final pending</div>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </section>
+              </>
             )}
           </div>
         )}

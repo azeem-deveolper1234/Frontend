@@ -1,7 +1,14 @@
 import axios from 'axios';
 
+const getBaseUrl = () => {
+  if (typeof window !== 'undefined') {
+    return `${window.location.protocol}//${window.location.hostname}:5000/api`;
+  }
+  return 'http://localhost:5000/api';
+};
+
 const API = axios.create({
-  baseURL: 'http://localhost:5000/api'
+  baseURL: getBaseUrl()
 });
 
 // Har request mein token automatically add ho
@@ -46,6 +53,9 @@ export const createMedicalReport = (data) => API.post('/medical-reports/create',
 export const getPatientReports = (patientId) => API.get(`/medical-reports/patient/${patientId}`);
 export const getAllUsers = () => API.get('/auth/users');
 export const getPatientQueue = (userId) => API.get(`/queue/patient/${userId}`);
+/** Admin — patient ki appointments, checkup reports, payments */
+export const getPatientClinicHistory = (userId) =>
+  API.get(`/queue/patient/${userId}/clinic-history`);
 
 export const completeFinalPayment = (paymentId, data) => 
   API.put(`/payments/${paymentId}/complete`, data);

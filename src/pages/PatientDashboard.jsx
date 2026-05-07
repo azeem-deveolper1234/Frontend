@@ -2,7 +2,24 @@ import React, { useState, useEffect, useRef } from 'react';
 import AppointmentReceipt from '../components/AppointmentReceipt';
 import { useAuth } from '../context/AuthContext';
 import socket from '../services/socket';
-import { getAllDoctors, joinQueue, getQueueStatus, cancelQueue, getQueueHistory, getMyReports ,createPayment, getPaymentHistory} from '../services/api';
+import {
+  getAllDoctors,
+  joinQueue,
+  getQueueStatus,
+  cancelQueue,
+  getQueueHistory,
+  getMyReports,
+  createPayment,
+  getPaymentHistory
+} from '../services/api';
+
+/** `<input type="date" min>` ke liye — `toISOString().split('T')[0]` UTC hota hai, is se "aaj" local calendar par sahi rehta hai */
+function localDateInputValue(d = new Date()) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
 
 const PatientDashboard = () => {
   const { user, logoutUser } = useAuth();
@@ -172,6 +189,13 @@ const processJoinQueue = async (formSnapshot) => {
     }
 
     const bookedAt = new Date();
+    const pm = form.paymentMethod;
+    const paymentMethodLabels = {
+      easypaisa: 'Easypaisa (mobile wallet)',
+      jazzcash: 'JazzCash (mobile wallet)',
+      card: 'Online debit / credit card',
+      cash: 'Cash at clinic'
+    };
     setReceiptData({
       tokenNumber: queueRes.data.tokenNumber,
       patientName: user.name,
@@ -185,7 +209,10 @@ const processJoinQueue = async (formSnapshot) => {
       }),
       priority: form.priority,
       notes: form.notes,
-      totalAmount: doctorObj ? Number(doctorObj.consultationFee) || fee : fee
+      totalAmount: doctorObj ? Number(doctorObj.consultationFee) || fee : fee,
+      paymentMethod: pm,
+      paymentMethodLabel: paymentMethodLabels[pm] || pm,
+      paidViaLastDigits: form.paidViaLastDigits || null
     });
 
     setShowReceipt(true);
@@ -271,10 +298,22 @@ const handleGatewayNext = () => {
     setGatewayStep('processing');
     clearGatewayTimers();
 
+    const digits = String(gatewayPhone).replace(/\D/g, '');
+    let paidViaLastDigits = null;
+    if (locked.paymentMethod === 'easypaisa' || locked.paymentMethod === 'jazzcash') {
+      paidViaLastDigits = digits.slice(-4) || null;
+    } else if (locked.paymentMethod === 'card') {
+      paidViaLastDigits = digits.replace(/\s/g, '').slice(-4) || null;
+    }
+    const payload =
+      paidViaLastDigits != null && paidViaLastDigits !== ''
+        ? { ...locked, paidViaLastDigits }
+        : locked;
+
     const t1 = setTimeout(() => {
       setGatewayStep('success');
       const t2 = setTimeout(() => {
-        processJoinQueue(locked);
+        processJoinQueue(payload);
       }, 1500);
       gatewayTimersRef.current.push(t2);
     }, 2000);
@@ -321,9 +360,17 @@ const handleGatewayNext = () => {
       {/* Header */}
       <div className={`p-6 text-center text-white ${(joinForm.paymentMethod === 'easypaisa' ? 'bg-gradient-to-br from-green-500 to-green-600' : (joinForm.paymentMethod === 'jazzcash' ? 'bg-gradient-to-br from-red-600 to-red-700' : 'bg-gradient-to-br from-blue-600 to-blue-800'))}`}>
         <h2 className="text-2xl font-extrabold tracking-tight">
-          {joinForm.paymentMethod === 'easypaisa' ? 'Easypaisa' : (joinForm.paymentMethod === 'jazzcash' ? 'JazzCash' : 'Secure Card')}
+          {joinForm.paymentMethod === 'easypaisa'
+            ? 'Easypaisa'
+            : joinForm.paymentMethod === 'jazzcash'
+              ? 'JazzCash'
+              : 'Online card'}
         </h2>
-        <p className="text-white/80 text-sm mt-1">Virtual Checkout</p>
+        <p className="text-white/80 text-sm mt-1">
+          {joinForm.paymentMethod === 'card'
+            ? 'Debit / credit — online checkout'
+            : 'Mobile wallet — online checkout'}
+        </p>
       </div>
 
       {/* Body */}
@@ -529,10 +576,10 @@ const handleGatewayNext = () => {
     </div>
   </div>
 ) : (
-  <div className="bg-green-50 border border-green-200 rounded-2xl p-6 mb-6 text-center">
-    <div className="text-4xl mb-2">✅</div>
-    <p className="text-green-700 font-semibold text-lg">Aapka checkup complete ho gaya!</p>
-    <p className="text-gray-500 text-sm mt-1">Medical Reports tab mein apni report dekh sakte hain</p>
+  <div className="bg-blue-50 border border-blue-200 rounded-2xl p-6 mb-6 text-center">
+    <div className="text-4xl mb-2">📅</div>
+    <p className="text-blue-700 font-semibold text-lg">Aapka is waqt koi active appointment nahi hai</p>
+    <p className="text-gray-500 text-sm mt-1">Doctor se checkup ke liye naya appointment book karein</p>
     <button
       onClick={() => handleTabChange('book')}
       className="mt-3 bg-blue-600 text-white px-6 py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 transition"
@@ -599,7 +646,7 @@ const handleGatewayNext = () => {
                     value={joinForm.appointmentDate}
                     onChange={(e) => setJoinForm({ ...joinForm, appointmentDate: e.target.value })}
                     required
-                    min={new Date().toISOString().split('T')[0]}
+                    min={localDateInputValue()}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
                   />
                 </div>
@@ -628,9 +675,12 @@ const handleGatewayNext = () => {
                 </div>
 
 
-{/* Payment Section */}
+{/* Payment Section — Easypaisa / JazzCash = wallets; card = online debit/credit */}
 <div className="border-t border-gray-200 pt-4 mt-4">
-  <h3 className="font-semibold text-gray-800 mb-3">💳 Advance Payment (50%)</h3>
+  <h3 className="font-semibold text-gray-800 mb-1">💳 Advance (50%)</h3>
+  <p className="text-xs text-gray-500 mb-3 leading-relaxed">
+    Online: <strong>Easypaisa</strong>, <strong>JazzCash</strong>, ya <strong>bank debit / credit card</strong>. Clinic par sirf <strong>cash</strong> bhi.
+  </p>
   
   <div className="mb-3">
     <label className="block text-sm font-medium text-gray-700 mb-1">Consultation Fee (Rs.)</label>
@@ -645,16 +695,20 @@ const handleGatewayNext = () => {
   </div>
 
   <div className="mb-3">
-    <label className="block text-sm font-medium text-gray-700 mb-1">Payment Method</label>
+    <label className="block text-sm font-medium text-gray-700 mb-1">Payment method</label>
     <select
       value={joinForm.paymentMethod}
       onChange={(e) => setJoinForm({ ...joinForm, paymentMethod: e.target.value })}
       className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
     >
-      <option value="cash">Cash at Clinic</option>
-      <option value="easypaisa">Easypaisa</option>
-      <option value="jazzcash">JazzCash</option>
-      <option value="card">Credit/Debit Card</option>
+      <optgroup label="Clinic">
+        <option value="cash">Cash at clinic</option>
+      </optgroup>
+      <optgroup label="Online advance">
+        <option value="easypaisa">Easypaisa (wallet)</option>
+        <option value="jazzcash">JazzCash (wallet)</option>
+        <option value="card">Debit / credit card (online)</option>
+      </optgroup>
     </select>
   </div>
 
@@ -789,8 +843,12 @@ const handleGatewayNext = () => {
                         {item.notes && <p className="text-gray-500 text-sm mt-1">Notes: {item.notes}</p>}
                       </div>
                       <div className="flex flex-col items-end space-y-2">
-                        <span className="bg-green-100 text-green-700 text-xs px-3 py-1 rounded-full font-semibold">
-                          ✅ Completed
+                        <span className={`text-xs px-3 py-1 rounded-full font-semibold ${
+                          item.status === 'cancelled' 
+                            ? 'bg-red-100 text-red-700' 
+                            : 'bg-green-100 text-green-700'
+                        }`}>
+                          {item.status === 'cancelled' ? '❌ Cancelled' : '✅ Completed'}
                         </span>
                         <span className={`text-xs px-3 py-1 rounded-full font-semibold ${
                           item.priority === 'emergency'
