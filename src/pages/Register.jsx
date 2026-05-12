@@ -144,6 +144,8 @@ const Register = () => {
                   onChange={handleChange}
                   placeholder="••••••••"
                   required
+                  minLength={6}
+                  autoComplete="new-password"
                   className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all text-slate-700"
                 />
               </div>

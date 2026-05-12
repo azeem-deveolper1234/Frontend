@@ -89,6 +89,8 @@ const AdminDashboard = () => {
   const [historyUserId, setHistoryUserId] = useState('');
   const [patientHistoryData, setPatientHistoryData] = useState(null);
   const [patientHistoryLoading, setPatientHistoryLoading] = useState(false);
+  /** Clear old data: backend minimum 14 days — is se zyada purana hi delete hota hai */
+  const [clearRetentionDays, setClearRetentionDays] = useState(14);
   
   const [showFinalPayGateway, setShowFinalPayGateway] = useState(false);
   const [finalPayStep, setFinalPayStep] = useState('phone');
@@ -145,7 +147,7 @@ const AdminDashboard = () => {
       const res = await getAllPayments();
       setPayments(res.data.payments);
     } catch (err) {
-      console.log(err);
+      console.error(err);
     }
   };
 
@@ -279,13 +281,18 @@ const AdminDashboard = () => {
   };
 
   const handleClearOldData = async () => {
-    if (!window.confirm('Clear old queue data? (Older than 14 days)')) {
+    const days = Math.max(14, Number(clearRetentionDays) || 14);
+    if (
+      !window.confirm(
+        `Purana queue data delete karein?\n\nSirf wo records jo ${days} din se ZYADA purane hon (aaj se pehle ki cutoff date). Pehle ${days} din ka data safe rahega — minimum 14 din ki policy hai.`
+      )
+    ) {
       return;
     }
     setLoading(true);
     setError('');
     try {
-      const res = await clearOldData({ days: 14 });
+      const res = await clearOldData({ days });
       const base = res.data?.message || 'Done';
       const hint = res.data?.hint;
       setMessage(hint ? `✅ ${base}\n\n${hint}` : `✅ ${base}`);
@@ -615,7 +622,20 @@ const AdminDashboard = () => {
                   <h2 className="text-2xl font-bold text-slate-800 tracking-tight">Today's Overview</h2>
                   <p className="text-slate-500 text-sm mt-1">Live clinic statistics for today</p>
                 </div>
-                <div className="flex gap-3">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+                  <label className="flex items-center gap-2 text-xs text-slate-500 sm:text-sm">
+                    <span className="whitespace-nowrap font-medium text-slate-600">Delete older than</span>
+                    <select
+                      value={clearRetentionDays}
+                      onChange={(e) => setClearRetentionDays(Number(e.target.value))}
+                      className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-800 focus:ring-2 focus:ring-indigo-500"
+                    >
+                      {[14, 30, 60, 90, 180].map((d) => (
+                        <option key={d} value={d}>{d} days</option>
+                      ))}
+                    </select>
+                    <span className="text-[11px] sm:text-xs text-slate-400 max-w-[200px] sm:max-w-none">(min 14 — recent data safe)</span>
+                  </label>
                   <button onClick={handleClearOldData} disabled={loading} className="px-4 py-2 bg-slate-100 text-slate-600 hover:text-red-600 hover:bg-red-50 rounded-xl text-sm font-semibold transition flex items-center gap-2">
                     <Trash2 className="w-4 h-4" /> Clean Data
                   </button>
@@ -968,9 +988,11 @@ const AdminDashboard = () => {
                             <td className="px-6 py-4 text-slate-600 text-xs">{finalDesc || '—'}</td>
                             <td className="px-6 py-4 text-center">
                               {isPending ? (
-                                <div className="flex gap-2 justify-center">
+                                <div className="flex gap-2 justify-center flex-wrap">
                                   <button onClick={() => openFinalPaymentGateway(p, 'cash')} className="bg-emerald-50 text-emerald-600 hover:bg-emerald-100 px-3 py-1.5 rounded-lg text-xs font-bold transition">Cash</button>
                                   <button onClick={() => openFinalPaymentGateway(p, 'card')} className="bg-indigo-50 text-indigo-600 hover:bg-indigo-100 px-3 py-1.5 rounded-lg text-xs font-bold transition">Card</button>
+                                  <button onClick={() => openFinalPaymentGateway(p, 'easypaisa')} className="bg-emerald-50 text-emerald-600 hover:bg-emerald-100 px-3 py-1.5 rounded-lg text-xs font-bold transition">Easypaisa</button>
+                                  <button onClick={() => openFinalPaymentGateway(p, 'jazzcash')} className="bg-red-50 text-red-600 hover:bg-red-100 px-3 py-1.5 rounded-lg text-xs font-bold transition">JazzCash</button>
                                 </div>
                               ) : (
                                 <span className="text-slate-400 text-xs font-medium">Settled</span>
@@ -1014,25 +1036,25 @@ const AdminDashboard = () => {
                   </button>
                 </div>
 
-                {patientHistoryData && (
+                {patientHistoryData?.patient && (
                   <div className="space-y-6 animate-in fade-in">
                     <div className="bg-indigo-50 rounded-2xl p-6 flex flex-col sm:flex-row justify-between sm:items-center border border-indigo-100 gap-4">
                       <div>
-                        <h3 className="text-xl font-bold text-indigo-900">{patientHistoryData.user.name}</h3>
-                        <p className="text-indigo-600 text-sm mt-1">{patientHistoryData.user.email} | {patientHistoryData.user.phone}</p>
+                        <h3 className="text-xl font-bold text-indigo-900">{patientHistoryData.patient.name}</h3>
+                        <p className="text-indigo-600 text-sm mt-1">{patientHistoryData.patient.email} | {patientHistoryData.patient.phone || '—'}</p>
                       </div>
                       <div className="bg-white px-4 py-2 rounded-xl border border-indigo-100">
                         <span className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Total Visits</span>
-                        <span className="block text-2xl font-black text-indigo-600 text-right">{patientHistoryData.queues.length}</span>
+                        <span className="block text-2xl font-black text-indigo-600 text-right">{(patientHistoryData.visits ?? []).length}</span>
                       </div>
                     </div>
 
-                    <h4 className="font-bold text-slate-800 uppercase tracking-wider text-sm mt-8 mb-4 flex items-center gap-2"><History className="w-4 h-4" /> Timeline</h4>
+                    <h4 className="font-bold text-slate-800 uppercase tracking-wider text-sm mt-8 mb-4 flex items-center gap-2"><History className="w-4 h-4" /> Queue / visits</h4>
                     <div className="space-y-4">
-                      {patientHistoryData.queues.length === 0 ? (
+                      {(patientHistoryData.visits ?? []).length === 0 ? (
                         <p className="text-slate-500 italic bg-slate-50 p-6 rounded-2xl text-center border border-slate-100">No visits found.</p>
                       ) : (
-                        patientHistoryData.queues.map((q) => {
+                        (patientHistoryData.visits ?? []).map((q) => {
                           const vs = visitStatusLabel(q.status);
                           return (
                             <div key={q._id} className="bg-white border border-slate-200 rounded-2xl p-5 hover:shadow-sm transition">
@@ -1062,6 +1084,45 @@ const AdminDashboard = () => {
                             </div>
                           );
                         })
+                      )}
+                    </div>
+
+                    <h4 className="font-bold text-slate-800 uppercase tracking-wider text-sm mt-8 mb-4 flex items-center gap-2"><FileText className="w-4 h-4" /> Medical reports</h4>
+                    <div className="space-y-3">
+                      {(patientHistoryData.reports ?? []).length === 0 ? (
+                        <p className="text-slate-500 italic bg-slate-50 p-4 rounded-2xl text-center border border-slate-100 text-sm">No reports on file.</p>
+                      ) : (
+                        (patientHistoryData.reports ?? []).map((r) => (
+                          <div key={r._id} className="bg-white border border-slate-200 rounded-2xl p-4 text-sm">
+                            <div className="flex flex-wrap justify-between gap-2 mb-2">
+                              <span className="font-semibold text-slate-800">{r.diagnosis}</span>
+                              <span className="text-slate-500">{formatHistoryDate(r.createdAt)}</span>
+                            </div>
+                            <p className="text-slate-600">
+                              {r.doctor?.name ? `Dr. ${r.doctor.name}` : 'Doctor'} · Token #{r.queue?.tokenNumber ?? '—'}
+                            </p>
+                            {r.symptoms ? <p className="text-slate-500 mt-2 text-xs">Symptoms: {r.symptoms}</p> : null}
+                          </div>
+                        ))
+                      )}
+                    </div>
+
+                    <h4 className="font-bold text-slate-800 uppercase tracking-wider text-sm mt-8 mb-4 flex items-center gap-2"><CreditCard className="w-4 h-4" /> Payments</h4>
+                    <div className="space-y-3">
+                      {(patientHistoryData.payments ?? []).length === 0 ? (
+                        <p className="text-slate-500 italic bg-slate-50 p-4 rounded-2xl text-center border border-slate-100 text-sm">No payment records.</p>
+                      ) : (
+                        (patientHistoryData.payments ?? []).map((p) => (
+                          <div key={p._id} className="bg-white border border-slate-200 rounded-2xl p-4 text-sm flex flex-wrap justify-between gap-2">
+                            <div>
+                              <span className="font-medium text-slate-800">Rs. {p.totalAmount ?? 0}</span>
+                              <span className="text-slate-500 ml-2">Advance: {p.advanceAmount ?? 0} · Remaining: {p.remainingAmount ?? 0}</span>
+                            </div>
+                            <div className="text-slate-500">
+                              {p.finalStatus || p.advanceStatus || '—'} · {formatHistoryDate(p.createdAt)}
+                            </div>
+                          </div>
+                        ))
                       )}
                     </div>
                   </div>

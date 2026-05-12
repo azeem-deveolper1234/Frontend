@@ -736,7 +736,7 @@ const PatientDashboard = () => {
                   <div className="p-6 space-y-5">
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                       {[
-                        { id: 'cash', label: 'Cash at Clinic', icon: Banknote },
+                        // { id: 'cash', label: 'Cash at Clinic', icon: Banknote },
                         { id: 'card', label: 'Online Card', icon: CreditCard },
                         { id: 'easypaisa', label: 'Easypaisa', icon: Wallet },
                         { id: 'jazzcash', label: 'JazzCash', icon: Wallet }

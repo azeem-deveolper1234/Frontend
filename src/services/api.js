@@ -1,10 +1,27 @@
 import axios from 'axios';
 
-const getBaseUrl = () => {
-  if (typeof window !== 'undefined') {
-    return `${window.location.protocol}//${window.location.hostname}:5000/api`;
+/** Backend HTTP origin (no path), e.g. http://localhost:5000 — used by Socket.IO */
+export function getBackendOrigin() {
+  const apiUrl = process.env.REACT_APP_API_URL;
+  if (apiUrl) {
+    try {
+      return new URL(apiUrl).origin;
+    } catch {
+      /* fall through */
+    }
   }
-  return 'http://localhost:5000/api';
+  if (typeof window !== 'undefined') {
+    return `${window.location.protocol}//${window.location.hostname}:5000`;
+  }
+  return 'http://localhost:5000';
+}
+
+const getBaseUrl = () => {
+  const apiUrl = process.env.REACT_APP_API_URL;
+  if (apiUrl) {
+    return apiUrl.replace(/\/$/, '');
+  }
+  return `${getBackendOrigin()}/api`;
 };
 
 const API = axios.create({
@@ -19,6 +36,25 @@ API.interceptors.request.use((req) => {
   }
   return req;
 });
+
+// Expired / invalid token — logout UX (login/register excluded)
+API.interceptors.response.use(
+  (res) => res,
+  (err) => {
+    const status = err.response?.status;
+    const reqUrl = String(err.config?.url || '');
+    const isAuthAttempt =
+      reqUrl.includes('/auth/login') || reqUrl.includes('/auth/register');
+    if (status === 401 && !isAuthAttempt && localStorage.getItem('token')) {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+        window.location.assign('/login');
+      }
+    }
+    return Promise.reject(err);
+  }
+);
 
 // AUTH
 export const register = (data) => API.post('/auth/register', data);
@@ -57,13 +93,12 @@ export const getPatientQueue = (userId) => API.get(`/queue/patient/${userId}`);
 export const getPatientClinicHistory = (userId) =>
   API.get(`/queue/patient/${userId}/clinic-history`);
 
-export const completeFinalPayment = (paymentId, data) => 
+export const completeFinalPayment = (paymentId, data) =>
   API.put(`/payments/${paymentId}/complete`, data);
 export const getQueuePayment = (queueId) => API.get(`/payments/queue/${queueId}`);
 
 export const addDoctor = (data) => API.post('/doctors/add', data);
 export const updateDoctor = (id, data) => API.put(`/doctors/${id}/update`, data);
 export const deleteDoctor = (id) => API.delete(`/doctors/${id}/delete`);
-
 
 export default API;
