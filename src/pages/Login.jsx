@@ -60,7 +60,7 @@ const Login = () => {
             <HeartPulse className="w-8 h-8 text-white" />
           </motion.div>
           <h1 className="text-2xl font-bold text-white tracking-tight relative z-10">City Medical Clinic</h1>
-          <p className="text-primary-100 text-sm mt-1 font-medium relative z-10">Premium Queue Management</p>
+          <p className="text-primary-100 text-sm mt-1 font-medium relative z-10">Premium Queue Management system</p>
         </div>
 
         {/* Form */}
