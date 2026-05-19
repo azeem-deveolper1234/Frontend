@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import AppointmentReceipt from '../components/AppointmentReceipt';
+import LiveQueueCard from '../components/LiveQueueCard';
 import { useAuth } from '../context/AuthContext';
 import socket from '../services/socket';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -982,6 +983,9 @@ const PatientDashboard = () => {
           </motion.div>
         )}
       </main>
+
+      {/* Floating Persistent Live Queue Card */}
+      <LiveQueueCard queueStatus={queueStatus} onCancel={handleCancelQueue} />
     </div>
   );
 };
