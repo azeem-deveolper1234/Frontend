@@ -6,8 +6,9 @@ import socket from '../services/socket';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Home, CalendarPlus, Clock, History, FileText, User, LogOut, 
-  Bell, CheckCircle2, XCircle, CreditCard, Wallet, AlertCircle, 
-  RefreshCw, Activity, HeartPulse, ChevronRight, ShieldCheck, Banknote, Lock
+  CheckCircle2, CreditCard, Wallet, AlertCircle, 
+  RefreshCw, Activity, HeartPulse, ChevronRight, ShieldCheck, Banknote, Lock,
+  Users, Hourglass, Calendar, Sparkles, FileDown, ShieldAlert
 } from 'lucide-react';
 import {
   getAllDoctors, joinQueue, getQueueStatus, cancelQueue, 
@@ -303,16 +304,54 @@ const PatientDashboard = () => {
 
   const tabs = [
     { id: 'home', label: 'Home', icon: Home },
-    { id: 'book', label: 'Book', icon: CalendarPlus },
-    { id: 'status', label: 'Queue Status', icon: Clock },
-    { id: 'history', label: 'History', icon: History },
-    { id: 'reports', label: 'Reports', icon: FileText }
+    { id: 'book', label: 'Book Appointment', icon: CalendarPlus },
+    { id: 'status', label: 'Queue Tracker', icon: Clock },
+    { id: 'history', label: 'Visit History', icon: History },
+    { id: 'reports', label: 'Medical Reports', icon: FileText }
   ];
 
+  // Proximity details helper for the large active boarding pass ticket card
+  const getProximityTicketStyle = () => {
+    if (!queueStatus) return {};
+    const { status, peopleAhead } = queueStatus;
+    if (status === 'serving' || peopleAhead === 0) {
+      return {
+        bg: 'from-emerald-500 via-teal-500 to-emerald-600',
+        glow: 'shadow-[0_15px_40px_rgba(16,185,129,0.3)]',
+        badge: 'bg-emerald-100 text-emerald-800',
+        statusLabel: 'Aapki bari aa gayi! Proceed Inside 🏃‍♂️'
+      };
+    }
+    if (peopleAhead <= 2) {
+      return {
+        bg: 'from-rose-500 via-pink-500 to-rose-600',
+        glow: 'shadow-[0_15px_40px_rgba(244,63,94,0.3)]',
+        badge: 'bg-rose-100 text-rose-800',
+        statusLabel: 'Turn is extremely close! Be outside doctor room 🚨'
+      };
+    }
+    if (peopleAhead <= 5) {
+      return {
+        bg: 'from-amber-500 via-orange-500 to-amber-600',
+        glow: 'shadow-[0_15px_40px_rgba(245,158,11,0.25)]',
+        badge: 'bg-amber-100 text-amber-800',
+        statusLabel: 'Your turn is approaching shortly.'
+      };
+    }
+    return {
+      bg: 'from-slate-800 via-indigo-900 to-slate-900',
+      glow: 'shadow-[0_15px_40px_rgba(99,102,241,0.2)]',
+      badge: 'bg-slate-700/50 text-white',
+      statusLabel: 'Waiting in queue. Keep tracking live updates.'
+    };
+  };
+
+  const ticketStyle = getProximityTicketStyle();
+
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
+    <div className="min-h-screen bg-slate-50/50 dark:bg-slate-950 flex flex-col font-sans">
       
-      {/* Messages Overlay */}
+      {/* Dynamic Messages Overlay banner */}
       <AnimatePresence>
         {(message || error) && (
           <motion.div 
@@ -321,9 +360,13 @@ const PatientDashboard = () => {
             exit={{ opacity: 0, y: -20 }}
             className="fixed top-20 left-0 right-0 z-40 flex justify-center px-4 pointer-events-none"
           >
-            <div className={`shadow-lg rounded-full px-6 py-3 flex items-center gap-3 backdrop-blur-md ${message ? 'bg-green-500/90 text-white' : 'bg-red-500/90 text-white'}`}>
+            <div className={`shadow-xl rounded-full px-6 py-3 flex items-center gap-3 backdrop-blur-md ${
+              message 
+                ? 'bg-emerald-500/90 text-white shadow-emerald-500/10' 
+                : 'bg-rose-500/90 text-white shadow-rose-500/10'
+            }`}>
               {message ? <CheckCircle2 className="w-5 h-5" /> : <AlertCircle className="w-5 h-5" />}
-              <span className="font-medium text-sm">{message || error}</span>
+              <span className="font-bold text-xs tracking-wide">{message || error}</span>
             </div>
           </motion.div>
         )}
@@ -336,61 +379,64 @@ const PatientDashboard = () => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 backdrop-blur-md p-4"
           >
             <motion.div 
               initial={{ scale: 0.9, y: 20 }}
               animate={{ scale: 1, y: 0 }}
               exit={{ scale: 0.9, y: 20 }}
-              className="bg-white w-full max-w-sm rounded-[2rem] shadow-2xl overflow-hidden flex flex-col relative"
+              className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col border border-slate-100 dark:border-slate-800"
             >
-              {/* Header */}
+              {/* Wallet Header */}
               <div className={`p-8 text-center text-white relative overflow-hidden ${
-                joinForm.paymentMethod === 'easypaisa' ? 'bg-green-500' : 
-                joinForm.paymentMethod === 'jazzcash' ? 'bg-red-500' : 'bg-slate-800'
+                joinForm.paymentMethod === 'easypaisa' ? 'bg-gradient-to-br from-green-500 to-emerald-600' : 
+                joinForm.paymentMethod === 'jazzcash' ? 'bg-gradient-to-br from-red-500 to-rose-600' : 
+                'bg-gradient-to-br from-slate-800 to-slate-950'
               }`}>
-                <div className="absolute inset-0 bg-white/10 opacity-20 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]"></div>
-                <h2 className="text-2xl font-bold tracking-tight relative z-10 flex items-center justify-center gap-2">
+                <div className="absolute inset-0 bg-white/5 opacity-10 bg-[radial-gradient(#ffffff_1px,transparent_1px)] [background-size:12px_12px]"></div>
+                <h2 className="text-2xl font-black tracking-tight relative z-10 flex items-center justify-center gap-2">
                   {joinForm.paymentMethod === 'card' ? <CreditCard className="w-6 h-6" /> : <Wallet className="w-6 h-6" />}
                   {joinForm.paymentMethod === 'easypaisa' ? 'Easypaisa' : joinForm.paymentMethod === 'jazzcash' ? 'JazzCash' : 'Secure Card'}
                 </h2>
-                <p className="text-white/80 text-sm mt-1 font-medium relative z-10">
+                <p className="text-white/80 text-xs font-semibold uppercase tracking-widest mt-1 relative z-10">
                   {joinForm.paymentMethod === 'card' ? 'Online Checkout' : 'Mobile Wallet Checkout'}
                 </p>
               </div>
 
-              {/* Body */}
+              {/* Form step columns */}
               <div className="p-8">
                 {gatewayStep === 'phone' && (
-                  <motion.div initial={{ x: 20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} className="space-y-5">
-                    <div className="text-center bg-slate-50 p-4 rounded-2xl border border-slate-100">
-                      <p className="text-slate-500 font-medium text-xs uppercase tracking-wider">Amount to Pay</p>
-                      <p className="text-3xl font-bold text-slate-800 mt-1">
+                  <motion.div initial={{ x: 20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} className="space-y-6">
+                    <div className="text-center bg-slate-50 dark:bg-slate-800/40 p-4 rounded-2xl border border-slate-100 dark:border-slate-800/40">
+                      <p className="text-slate-400 dark:text-slate-500 font-black text-[10px] uppercase tracking-wider">Amount to Pay (50% Advance)</p>
+                      <p className="text-3xl font-black text-slate-800 dark:text-slate-100 mt-1">
                         Rs. {(doctors.find(d => d.name === joinForm.serviceName)?.consultationFee || 1000) / 2}
                       </p>
                     </div>
-                    <div>
-                      <label className="block text-sm font-semibold text-slate-700 mb-2">
-                        {joinForm.paymentMethod === 'card' ? 'Card Number' : 'Mobile Number'}
+                    
+                    <div className="space-y-1.5">
+                      <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest pl-1">
+                        {joinForm.paymentMethod === 'card' ? 'Card Number' : 'Account Mobile Number'}
                       </label>
                       <input 
                         type={joinForm.paymentMethod === 'card' ? 'text' : 'tel'}
-                        className="w-full bg-slate-50 border border-slate-200 px-4 py-3.5 rounded-xl text-lg font-mono placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all"
+                        className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200/80 dark:border-slate-800/80 px-4 py-3.5 rounded-2xl text-lg font-mono placeholder-slate-400 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all"
                         placeholder={joinForm.paymentMethod === 'card' ? '4111 1111 1111 1111' : '03XX XXXXXXX'}
                         value={gatewayPhone}
                         onChange={(e) => setGatewayPhone(e.target.value)}
                         autoFocus
                       />
                     </div>
+                    
                     <button 
                       onClick={handleGatewayNext}
-                      className={`w-full py-4 rounded-xl text-white font-bold text-[15px] shadow-lg transition-all hover:-translate-y-0.5 active:translate-y-0 flex justify-center items-center gap-2 ${
-                        joinForm.paymentMethod === 'easypaisa' ? 'bg-green-500 hover:bg-green-600 shadow-green-500/25' : 
-                        joinForm.paymentMethod === 'jazzcash' ? 'bg-red-500 hover:bg-red-600 shadow-red-500/25' : 
-                        'bg-slate-800 hover:bg-slate-900 shadow-slate-800/25'
+                      className={`w-full py-4 rounded-2xl text-white font-extrabold text-sm shadow-lg transition-all hover:scale-[1.01] flex justify-center items-center gap-2 ${
+                        joinForm.paymentMethod === 'easypaisa' ? 'bg-green-500 hover:bg-green-600 shadow-green-500/10' : 
+                        joinForm.paymentMethod === 'jazzcash' ? 'bg-red-500 hover:bg-red-600 shadow-red-500/10' : 
+                        'bg-slate-800 hover:bg-slate-900 shadow-slate-800/10'
                       }`}
                     >
-                      Continue <ChevronRight className="w-5 h-5" />
+                      Continue to Pay <ChevronRight className="w-4 h-4" />
                     </button>
                     <button
                       type="button"
@@ -400,26 +446,26 @@ const PatientDashboard = () => {
                         setShowGateway(false);
                         setGatewayStep('phone');
                       }}
-                      className="w-full text-center text-slate-500 font-medium text-sm mt-2 hover:text-slate-800 transition"
+                      className="w-full text-center text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-400 font-extrabold text-xs mt-2 transition"
                     >
-                      Cancel
+                      Cancel Payment
                     </button>
                   </motion.div>
                 )}
 
                 {gatewayStep === 'otp' && (
                   <motion.div initial={{ x: 20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} className="space-y-6 text-center">
-                    <div className="w-16 h-16 bg-primary-50 text-primary-600 rounded-2xl flex items-center justify-center mx-auto mb-2 shadow-sm">
+                    <div className="w-16 h-16 bg-primary-50 dark:bg-slate-800 text-primary-500 rounded-2xl flex items-center justify-center mx-auto mb-2 shadow-sm">
                       <ShieldCheck className="w-8 h-8" />
                     </div>
                     <div>
-                      <p className="text-slate-600 text-sm">Enter 4-digit verification code sent to</p>
-                      <strong className="text-slate-800 text-lg block mt-1">{gatewayPhone}</strong>
+                      <p className="text-slate-500 text-xs font-semibold leading-relaxed">Enter 4-digit verification code sent to</p>
+                      <strong className="text-slate-800 dark:text-slate-100 text-lg block mt-1 tracking-wide">{gatewayPhone}</strong>
                     </div>
                     <input 
                       type="text" 
                       maxLength="4"
-                      className="w-40 mx-auto bg-slate-50 border border-slate-200 px-4 py-3 rounded-xl text-3xl font-bold tracking-[0.5em] text-center focus:outline-none focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all"
+                      className="w-40 mx-auto bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 px-4 py-3 rounded-2xl text-3xl font-bold tracking-[0.5em] text-center focus:outline-none focus:ring-2 focus:ring-primary-500 text-slate-800 dark:text-slate-100"
                       placeholder="1234"
                       value={gatewayOtp}
                       onChange={(e) => setGatewayOtp(e.target.value)}
@@ -427,18 +473,18 @@ const PatientDashboard = () => {
                     />
                     <button 
                       onClick={handleGatewayNext}
-                      className="w-full bg-slate-900 text-white py-4 rounded-xl font-bold text-[15px] shadow-lg shadow-slate-900/25 transition-all hover:bg-black hover:-translate-y-0.5 active:translate-y-0"
+                      className="w-full bg-slate-900 dark:bg-slate-100 dark:text-slate-950 text-white py-4 rounded-2xl font-extrabold text-sm shadow-md transition-all hover:bg-black"
                     >
-                      Verify & Pay
+                      Verify & Pay Rs. {(doctors.find(d => d.name === joinForm.serviceName)?.consultationFee || 1000) / 2}
                     </button>
-                    <button onClick={() => setGatewayStep('phone')} className="text-slate-500 font-medium text-sm hover:text-slate-800 transition">Go Back</button>
+                    <button onClick={() => setGatewayStep('phone')} className="text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-400 font-extrabold text-xs block mx-auto transition">Go Back</button>
                   </motion.div>
                 )}
 
                 {gatewayStep === 'processing' && (
                   <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="py-12 text-center">
                     <div className="relative w-24 h-24 mx-auto mb-6">
-                      <div className={`absolute inset-0 rounded-full border-4 border-slate-100`}></div>
+                      <div className="absolute inset-0 rounded-full border-4 border-slate-100 dark:border-slate-800"></div>
                       <div className={`absolute inset-0 rounded-full border-4 border-t-transparent animate-spin ${
                         joinForm.paymentMethod === 'easypaisa' ? 'border-green-500' : 
                         joinForm.paymentMethod === 'jazzcash' ? 'border-red-500' : 'border-slate-800'
@@ -447,21 +493,20 @@ const PatientDashboard = () => {
                         <Lock className="w-8 h-8 text-slate-400" />
                       </div>
                     </div>
-                    <h3 className="text-xl font-bold text-slate-800">Processing Payment</h3>
-                    <p className="text-slate-500 text-sm mt-2">Please do not close this window</p>
+                    <h3 className="text-lg font-black text-slate-800 dark:text-slate-100">Securing Payment</h3>
+                    <p className="text-slate-400 dark:text-slate-500 text-xs font-semibold mt-1">Safarish checking verification notes...</p>
                   </motion.div>
                 )}
 
                 {gatewayStep === 'success' && (
-                  <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="py-10 text-center">
-                    <div className={`w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6 shadow-xl ${
-                      joinForm.paymentMethod === 'easypaisa' ? 'bg-green-100 text-green-500 shadow-green-500/20' : 
-                      joinForm.paymentMethod === 'jazzcash' ? 'bg-red-100 text-red-500 shadow-red-500/20' : 'bg-blue-100 text-blue-500 shadow-blue-500/20'
-                    }`}>
-                      <CheckCircle2 className="w-12 h-12" />
+                  <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="py-10 text-center space-y-4">
+                    <div className="w-20 h-20 bg-emerald-50 dark:bg-emerald-950/20 text-emerald-500 rounded-full flex items-center justify-center mx-auto shadow-sm">
+                      <CheckCircle2 className="w-10 h-10 animate-bounce" />
                     </div>
-                    <h3 className="text-2xl font-bold text-slate-800">Successful!</h3>
-                    <p className="text-slate-500 text-sm mt-2">Payment securely captured.</p>
+                    <div>
+                      <h3 className="text-xl font-black text-slate-800 dark:text-slate-100">Payment Successful</h3>
+                      <p className="text-slate-400 dark:text-slate-500 text-xs font-semibold mt-1">Generating appointment receipt ticket...</p>
+                    </div>
                   </motion.div>
                 )}
               </div>
@@ -470,48 +515,48 @@ const PatientDashboard = () => {
         )}
       </AnimatePresence>
 
-      {showReceipt && receiptData && (
-        <AppointmentReceipt
-          key={`${receiptData.tokenNumber}-${receiptData.bookingTime}`}
-          data={receiptData}
-          onClose={() => setShowReceipt(false)}
-        />
-      )}
-
-      {/* Navbar */}
-      <nav className="bg-white border-b border-slate-200 sticky top-0 z-30">
+      {/* Modern Global Layout with Top Nav & Tabs Bar */}
+      <nav className="bg-white dark:bg-slate-900 border-b border-slate-200/60 dark:border-slate-800/80 z-30 relative shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-20">
+          <div className="flex justify-between h-20">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-primary-100 rounded-2xl flex items-center justify-center text-primary-600">
-                <HeartPulse className="w-7 h-7" />
-              </div>
+              <motion.div 
+                whileHover={{ rotate: 15 }}
+                className="w-11 h-11 bg-primary-500/10 rounded-2xl flex items-center justify-center border border-primary-500/20"
+              >
+                <HeartPulse className="w-6 h-6 text-primary-500" />
+              </motion.div>
               <div>
-                <h1 className="text-slate-800 font-bold text-xl tracking-tight">City Medical</h1>
-                <p className="text-slate-500 text-xs font-medium uppercase tracking-wider">Patient Portal</p>
+                <span className="font-black text-lg text-slate-800 dark:text-slate-100 tracking-tight leading-none block">Patient Portal</span>
+                <span className="text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-wider">City Medical Smart Queue</span>
               </div>
             </div>
-            <div className="flex items-center gap-6">
-              <div className="hidden sm:flex items-center gap-2 text-slate-600 bg-slate-50 px-4 py-2 rounded-full border border-slate-100">
-                <User className="w-4 h-4 text-primary-500" />
-                <span className="text-sm font-semibold">{user?.name}</span>
+            
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-3 bg-slate-50 dark:bg-slate-800/40 py-1.5 pl-3.5 pr-1.5 rounded-2xl border border-slate-100 dark:border-slate-800/40">
+                <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Aslam</span>
+                <div className="w-7 h-7 rounded-xl bg-primary-500 text-white flex items-center justify-center font-bold text-xs uppercase shadow-sm">
+                  {user?.name ? user.name.slice(0,2) : 'PT'}
+                </div>
               </div>
-              <button
+              <motion.button 
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
                 onClick={logoutUser}
-                className="text-slate-500 hover:text-red-500 p-2 rounded-full hover:bg-red-50 transition-colors"
+                className="text-slate-400 hover:text-rose-500 dark:text-slate-600 dark:hover:text-rose-400 p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/20 border border-slate-100 dark:border-slate-800/60 transition-colors"
                 title="Logout"
               >
-                <LogOut className="w-5 h-5" />
-              </button>
+                <LogOut className="w-4 h-4" />
+              </motion.button>
             </div>
           </div>
         </div>
       </nav>
 
-      {/* Navigation Tabs */}
-      <div className="bg-white border-b border-slate-200 shadow-sm z-20">
+      {/* Tabs Menu Section */}
+      <div className="bg-white dark:bg-slate-900 border-b border-slate-200/50 dark:border-slate-800/60 shadow-xs z-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex space-x-8 overflow-x-auto hide-scrollbar">
+          <div className="flex space-x-6 overflow-x-auto hide-scrollbar">
             {tabs.map(tab => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.id;
@@ -519,16 +564,16 @@ const PatientDashboard = () => {
                 <button
                   key={tab.id}
                   onClick={() => handleTabChange(tab.id)}
-                  className={`py-5 flex items-center gap-2 text-sm font-semibold whitespace-nowrap transition-colors relative ${
-                    isActive ? 'text-primary-600' : 'text-slate-500 hover:text-slate-800'
+                  className={`py-5 flex items-center gap-2 text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-colors relative ${
+                    isActive ? 'text-primary-500' : 'text-slate-400 dark:text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
                   }`}
                 >
-                  <Icon className={`w-4 h-4 ${isActive ? 'text-primary-500' : 'text-slate-400'}`} />
+                  <Icon className={`w-4 h-4 ${isActive ? 'text-primary-500 animate-pulse' : 'text-slate-400 dark:text-slate-500'}`} />
                   {tab.label}
                   {isActive && (
                     <motion.div 
                       layoutId="activeTabIndicator"
-                      className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary-600" 
+                      className="absolute bottom-0 left-0 right-0 h-1 bg-primary-500 rounded-t-full" 
                     />
                   )}
                 </button>
@@ -538,130 +583,154 @@ const PatientDashboard = () => {
         </div>
       </div>
 
-      {/* Main Content */}
+      {/* Main Content Pane */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
         
-        {/* HOME TAB */}
+        {/* ==================== HOME TAB ==================== */}
         {activeTab === 'home' && (
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
+          <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
               <div>
-                <h2 className="text-2xl font-bold text-slate-800 tracking-tight">Good morning, {user?.name.split(' ')[0]}!</h2>
-                <p className="text-slate-500 mt-1">Here is your health overview for today.</p>
+                <h2 className="text-3xl font-black text-slate-800 dark:text-slate-100 tracking-tight">Assalam-o-Alaikum, {user?.name.split(' ')[0]}!</h2>
+                <p className="text-slate-400 dark:text-slate-500 font-semibold text-sm mt-1">Real-time status check karein aur specialized care paayein.</p>
               </div>
             </div>
 
-            {/* Quick Status */}
+            {/* Premium Boarding Pass Active Queue Ticket */}
             {queueStatus ? (
-              <div className="bg-gradient-to-br from-primary-600 to-primary-800 rounded-3xl p-8 text-white shadow-soft relative overflow-hidden">
+              <motion.div 
+                whileHover={{ y: -2 }}
+                className={`bg-gradient-to-br ${ticketStyle.bg} rounded-[2.5rem] p-8 text-white ${ticketStyle.glow} relative overflow-hidden`}
+              >
+                <div className="absolute inset-0 opacity-10 bg-[radial-gradient(#ffffff_1px,transparent_1px)] [background-size:20px_20px] pointer-events-none"></div>
                 <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">
-                  <Activity className="w-48 h-48" />
+                  <Activity className="w-56 h-56" />
                 </div>
-                <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-                  <div>
-                    <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider mb-4 ${
-                      queueStatus.status === 'serving' ? 'bg-white text-green-600' : 'bg-white/20 text-white'
-                    }`}>
-                      {queueStatus.status === 'serving' ? <CheckCircle2 className="w-3.5 h-3.5" /> : <Clock className="w-3.5 h-3.5" />}
-                      {queueStatus.status === 'serving' ? 'Currently Serving You' : 'Waiting in Queue'}
+                
+                <div className="relative z-10 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-8">
+                  <div className="space-y-4">
+                    <span className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest ${ticketStyle.badge}`}>
+                      {queueStatus.status === 'serving' ? <CheckCircle2 className="w-3.5 h-3.5" /> : <Clock className="w-3.5 h-3.5 animate-spin" />}
+                      {ticketStyle.statusLabel}
                     </span>
-                    <h3 className="text-4xl font-black tracking-tight">Token #{queueStatus.yourToken}</h3>
-                    <p className="text-primary-100 font-medium mt-2 flex items-center gap-2">
-                      <User className="w-4 h-4" /> Dr. {queueStatus.serviceName}
-                    </p>
+                    <div>
+                      <h3 className="text-5xl font-black tracking-tighter">Token #{queueStatus.yourToken}</h3>
+                      <p className="text-white/80 font-bold mt-2 flex items-center gap-2 text-sm">
+                        <User className="w-4 h-4 text-teal-300" /> Dr. {queueStatus.serviceName} (Specialist Consultation)
+                      </p>
+                    </div>
                   </div>
 
-                  <div className="flex gap-4 w-full md:w-auto">
-                    <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 flex-1 md:w-32 border border-white/20 text-center">
-                      <p className="text-3xl font-bold">{queueStatus.peopleAhead}</p>
-                      <p className="text-xs text-primary-100 font-medium uppercase tracking-wider mt-1">Ahead</p>
+                  <div className="flex gap-4 w-full lg:w-auto">
+                    <div className="bg-white/10 backdrop-blur-md rounded-3xl p-5 flex-1 lg:w-36 border border-white/15 text-center shadow-xs">
+                      <p className="text-4xl font-black tracking-tight">{queueStatus.peopleAhead}</p>
+                      <p className="text-[10px] text-white/70 font-black uppercase tracking-widest mt-1.5">Patients Ahead</p>
                     </div>
-                    <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 flex-1 md:w-32 border border-white/20 text-center">
-                      <p className="text-3xl font-bold">{queueStatus.estimatedTime}m</p>
-                      <p className="text-xs text-primary-100 font-medium uppercase tracking-wider mt-1">Wait Time</p>
+                    <div className="bg-white/10 backdrop-blur-md rounded-3xl p-5 flex-1 lg:w-36 border border-white/15 text-center shadow-xs">
+                      <p className="text-4xl font-black tracking-tight">{queueStatus.estimatedTime}m</p>
+                      <p className="text-[10px] text-white/70 font-black uppercase tracking-widest mt-1.5">Est. Wait Time</p>
                     </div>
                   </div>
                 </div>
                 
-                <div className="mt-8 pt-6 border-t border-white/20 flex justify-end relative z-10">
-                  <button
+                <div className="mt-8 pt-6 border-t border-white/15 flex justify-end relative z-10">
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
                     onClick={handleCancelQueue}
-                    className="bg-white/10 hover:bg-red-500/80 text-white px-6 py-2.5 rounded-xl text-sm font-semibold transition-colors border border-white/20"
+                    className="bg-white/10 hover:bg-rose-500/90 text-white font-extrabold text-xs px-6 py-3 rounded-2xl transition duration-300 border border-white/10"
                   >
-                    Cancel Queue
-                  </button>
+                    Cancel Appointment
+                  </motion.button>
                 </div>
-              </div>
+              </motion.div>
             ) : (
-              <div className="bg-white border border-slate-200 rounded-3xl p-8 text-center shadow-sm">
-                <div className="w-20 h-20 bg-slate-50 text-slate-400 rounded-full flex items-center justify-center mx-auto mb-4">
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800/80 rounded-[2.5rem] p-10 text-center shadow-md relative overflow-hidden"
+              >
+                <div className="absolute top-[10%] left-[5%] w-48 h-48 rounded-full bg-primary-500/5 blur-3xl pointer-events-none"></div>
+                <div className="w-20 h-20 bg-slate-50 dark:bg-slate-800 text-slate-400 dark:text-slate-600 rounded-full flex items-center justify-center mx-auto mb-5 shadow-inner">
                   <CalendarPlus className="w-10 h-10" />
                 </div>
-                <h3 className="text-xl font-bold text-slate-800">No active appointments</h3>
-                <p className="text-slate-500 mt-2 max-w-sm mx-auto">You're all caught up. Book an appointment if you need to consult a doctor.</p>
-                <button
+                <h3 className="text-2xl font-black text-slate-800 dark:text-slate-200 tracking-tight">No active queue appointment</h3>
+                <p className="text-slate-400 dark:text-slate-500 font-semibold text-sm mt-2 max-w-md mx-auto leading-relaxed">
+                  Aapki aaj ki koi active appointment nahi hai. Clinic ke specialists se consult karne ke liye niche click karke ticket book karein.
+                </p>
+                <motion.button
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.97 }}
                   onClick={() => handleTabChange('book')}
-                  className="mt-6 bg-primary-600 text-white px-8 py-3 rounded-xl font-semibold hover:bg-primary-700 transition shadow-sm inline-flex items-center gap-2"
+                  className="mt-8 bg-primary-500 text-white px-8 py-3.5 rounded-2xl font-extrabold text-sm hover:bg-primary-600 hover:shadow-glow hover:shadow-primary-500/10 transition shadow-sm inline-flex items-center gap-2"
                 >
-                  Book Appointment <ChevronRight className="w-4 h-4" />
-                </button>
-              </div>
+                  Book Appointment <ChevronRight className="w-4.5 h-4.5" />
+                </motion.button>
+              </motion.div>
             )}
 
-            {/* Doctors List */}
-            <div>
-              <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
-                Our Specialists
+            {/* Premium Doctor Cards list */}
+            <div className="space-y-5">
+              <h3 className="text-xl font-black text-slate-800 dark:text-slate-100 flex items-center gap-2.5">
+                <Sparkles className="w-5 h-5 text-indigo-500" />
+                Our Specialized Doctors
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {doctors.map(doc => (
-                  <div key={doc._id} className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 hover:shadow-soft transition-all hover:-translate-y-1">
+                  <motion.div 
+                    key={doc._id} 
+                    whileHover={{ y: -4 }}
+                    className="bg-white dark:bg-slate-900 rounded-[2rem] shadow-xs hover:shadow-lg border border-slate-200/50 dark:border-slate-800 p-6 flex flex-col justify-between transition-all duration-300 relative overflow-hidden group"
+                  >
+                    <div className="absolute inset-0 bg-gradient-to-br from-primary-500/5 to-indigo-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
                     <div className="flex items-start gap-4">
-                      <div className="w-14 h-14 bg-secondary-50 text-secondary-600 rounded-full flex items-center justify-center shrink-0">
+                      <div className="w-14 h-14 bg-indigo-50/80 dark:bg-indigo-950/20 text-indigo-600 dark:text-indigo-400 rounded-2xl flex items-center justify-center shrink-0 shadow-xs border border-indigo-100/30 dark:border-indigo-500/10">
                         <User className="w-7 h-7" />
                       </div>
                       <div>
-                        <h4 className="font-bold text-slate-800 text-lg">Dr. {doc.name}</h4>
-                        <p className="text-primary-600 font-medium text-sm mb-3">{doc.specialization}</p>
+                        <h4 className="font-extrabold text-slate-800 dark:text-slate-100 text-lg group-hover:text-primary-500 transition-colors">Dr. {doc.name}</h4>
+                        <p className="text-primary-600 dark:text-primary-400 font-bold text-xs uppercase tracking-wider mt-0.5">{doc.specialization}</p>
                         
-                        <div className="space-y-2">
-                          <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
-                            <Clock className="w-3.5 h-3.5 text-slate-400" />
-                            {doc.slotDuration} min consultation
+                        <div className="space-y-2 mt-4">
+                          <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 font-semibold">
+                            <Clock className="w-4 h-4 text-slate-400 dark:text-slate-600" />
+                            {doc.slotDuration} min consultations
                           </div>
-                          <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
-                            <Banknote className="w-3.5 h-3.5 text-slate-400" />
-                            Rs. {doc.consultationFee}
+                          <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 font-semibold">
+                            <Banknote className="w-4 h-4 text-slate-400 dark:text-slate-600" />
+                            Consultation fee: <span className="font-black text-slate-800 dark:text-slate-200 ml-1">Rs. {doc.consultationFee}</span>
                           </div>
                         </div>
                       </div>
                     </div>
-                  </div>
+                  </motion.div>
                 ))}
               </div>
             </div>
           </motion.div>
         )}
 
-        {/* BOOK APPOINTMENT TAB */}
+        {/* ==================== BOOK APPOINTMENT TAB ==================== */}
         {activeTab === 'book' && (
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="max-w-2xl mx-auto">
-            <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-8 sm:p-10">
+          <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} className="max-w-2xl mx-auto">
+            <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-md border border-slate-200/50 dark:border-slate-800 p-8 sm:p-10 relative overflow-hidden">
+              <div className="absolute top-[5%] right-[5%] w-40 h-40 rounded-full bg-indigo-500/5 blur-3xl pointer-events-none"></div>
+              
               <div className="flex items-center gap-4 mb-8">
-                <div className="w-12 h-12 bg-primary-50 text-primary-600 rounded-full flex items-center justify-center shrink-0">
+                <div className="w-12 h-12 bg-primary-500/10 text-primary-500 rounded-2xl flex items-center justify-center shrink-0 border border-primary-500/10">
                   <CalendarPlus className="w-6 h-6" />
                 </div>
                 <div>
-                  <h2 className="text-2xl font-bold text-slate-800 tracking-tight">Book Appointment</h2>
-                  <p className="text-slate-500 text-sm mt-1">Select a doctor and time to join the queue</p>
+                  <h2 className="text-2xl font-black text-slate-800 dark:text-slate-100 tracking-tight leading-none">Book Appointment</h2>
+                  <p className="text-slate-400 dark:text-slate-500 text-xs font-semibold mt-1.5 uppercase tracking-wider">Select doctor & details for booking token</p>
                 </div>
               </div>
 
               <form onSubmit={handleJoinQueue} className="space-y-6">
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-2">Select Doctor</label>
+                  <div className="space-y-1.5">
+                    <label className="block text-[11px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest pl-1">Select Doctor</label>
                     <select
                       value={joinForm.serviceName}
                       onChange={(e) => {
@@ -673,7 +742,7 @@ const PatientDashboard = () => {
                         });
                       }}
                       required
-                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all text-slate-700 font-medium"
+                      className="w-full px-4 py-3.5 bg-slate-50 dark:bg-slate-950 border border-slate-200/80 dark:border-slate-800/80 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary-500 text-slate-700 dark:text-slate-200 font-bold"
                     >
                       <option value="">-- Choose Specialist --</option>
                       {doctors.map(doc => (
@@ -682,309 +751,382 @@ const PatientDashboard = () => {
                     </select>
                   </div>
 
-                  <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-2">Appointment Date</label>
+                  <div className="space-y-1.5">
+                    <label className="block text-[11px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest pl-1">Appointment Date</label>
                     <input
                       type="date"
                       value={joinForm.appointmentDate}
                       onChange={(e) => setJoinForm({ ...joinForm, appointmentDate: e.target.value })}
                       required
                       min={localDateInputValue()}
-                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all text-slate-700 font-medium"
+                      className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-950 border border-slate-200/80 dark:border-slate-800/80 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary-500 text-slate-700 dark:text-slate-200 font-bold"
                     />
                   </div>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-2">Priority Level</label>
+                {/* Priority Selection Cards */}
+                <div className="space-y-1.5">
+                  <label className="block text-[11px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest pl-1">Priority Level</label>
                   <div className="grid grid-cols-2 gap-4">
-                    <label className={`cursor-pointer border rounded-xl p-4 flex items-center gap-3 transition-all ${joinForm.priority === 'normal' ? 'border-primary-500 bg-primary-50 ring-1 ring-primary-500' : 'border-slate-200 bg-white hover:bg-slate-50'}`}>
+                    <label className={`cursor-pointer border rounded-2xl p-4 flex items-center gap-3 transition-all ${
+                      joinForm.priority === 'normal' 
+                        ? 'border-primary-500 bg-primary-50/50 dark:bg-primary-950/20 ring-1 ring-primary-500' 
+                        : 'border-slate-200/60 dark:border-slate-800 bg-white dark:bg-slate-950 hover:bg-slate-50'
+                    }`}>
                       <input type="radio" name="priority" value="normal" checked={joinForm.priority === 'normal'} onChange={(e) => setJoinForm({...joinForm, priority: e.target.value})} className="sr-only" />
-                      <div className={`w-5 h-5 rounded-full border flex items-center justify-center ${joinForm.priority === 'normal' ? 'border-primary-600 bg-primary-600' : 'border-slate-300'}`}>
-                        {joinForm.priority === 'normal' && <div className="w-2 h-2 rounded-full bg-white" />}
+                      <div className={`w-5 h-5 rounded-full border flex items-center justify-center ${joinForm.priority === 'normal' ? 'border-primary-500 bg-primary-500' : 'border-slate-300'}`}>
+                        {joinForm.priority === 'normal' && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
                       </div>
-                      <span className="font-semibold text-slate-700 text-sm">Normal Visit</span>
+                      <span className="font-extrabold text-slate-700 dark:text-slate-300 text-sm">Normal Visit</span>
                     </label>
-                    <label className={`cursor-pointer border rounded-xl p-4 flex items-center gap-3 transition-all ${joinForm.priority === 'emergency' ? 'border-red-500 bg-red-50 ring-1 ring-red-500' : 'border-slate-200 bg-white hover:bg-slate-50'}`}>
+                    
+                    <label className={`cursor-pointer border rounded-2xl p-4 flex items-center gap-3 transition-all ${
+                      joinForm.priority === 'emergency' 
+                        ? 'border-rose-500 bg-rose-50/50 dark:bg-rose-950/20 ring-1 ring-rose-500' 
+                        : 'border-slate-200/60 dark:border-slate-800 bg-white dark:bg-slate-950 hover:bg-slate-50'
+                    }`}>
                       <input type="radio" name="priority" value="emergency" checked={joinForm.priority === 'emergency'} onChange={(e) => setJoinForm({...joinForm, priority: e.target.value})} className="sr-only" />
-                      <div className={`w-5 h-5 rounded-full border flex items-center justify-center ${joinForm.priority === 'emergency' ? 'border-red-600 bg-red-600' : 'border-slate-300'}`}>
-                        {joinForm.priority === 'emergency' && <div className="w-2 h-2 rounded-full bg-white" />}
+                      <div className={`w-5 h-5 rounded-full border flex items-center justify-center ${joinForm.priority === 'emergency' ? 'border-rose-500 bg-rose-500' : 'border-slate-300'}`}>
+                        {joinForm.priority === 'emergency' && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
                       </div>
-                      <span className="font-semibold text-red-700 text-sm">Emergency</span>
+                      <span className="font-extrabold text-rose-600 dark:text-rose-400 text-sm">Emergency</span>
                     </label>
                   </div>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-2">Symptoms or Notes</label>
+                <div className="space-y-1.5">
+                  <label className="block text-[11px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest pl-1">Symptoms or Brief Notes</label>
                   <textarea
                     value={joinForm.notes}
                     onChange={(e) => setJoinForm({ ...joinForm, notes: e.target.value })}
-                    placeholder="Briefly describe why you need to see the doctor..."
+                    placeholder="Describe symptoms briefly..."
                     rows={3}
-                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all text-slate-700 text-sm resize-none"
+                    className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-950 border border-slate-200/80 dark:border-slate-800/80 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary-500 text-slate-700 dark:text-slate-200 text-xs font-semibold resize-none"
                   />
                 </div>
 
-                {/* Payment Section */}
-                <div className="border border-slate-200 rounded-2xl overflow-hidden mt-8">
-                  <div className="bg-slate-50 px-6 py-4 border-b border-slate-200 flex justify-between items-center">
-                    <h3 className="font-bold text-slate-800 flex items-center gap-2">
-                      <CreditCard className="w-5 h-5 text-slate-500" />
-                      Payment Method
+                {/* Secure checkout options inside booking card */}
+                <div className="border border-slate-200/60 dark:border-slate-800 rounded-2xl overflow-hidden mt-8">
+                  <div className="bg-slate-50 dark:bg-slate-800/40 px-6 py-4 border-b border-slate-200/80 dark:border-slate-800/80 flex justify-between items-center">
+                    <h3 className="font-extrabold text-slate-800 dark:text-slate-200 text-xs uppercase tracking-wider flex items-center gap-2">
+                      <CreditCard className="w-4 h-4 text-slate-500" />
+                      Choose Secure Payment Method
                     </h3>
                   </div>
+                  
                   <div className="p-6 space-y-5">
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <div className="grid grid-cols-3 gap-3">
                       {[
-                        // { id: 'cash', label: 'Cash at Clinic', icon: Banknote },
-                        { id: 'card', label: 'Online Card', icon: CreditCard },
+                        { id: 'card', label: 'Credit Card', icon: CreditCard },
                         { id: 'easypaisa', label: 'Easypaisa', icon: Wallet },
                         { id: 'jazzcash', label: 'JazzCash', icon: Wallet }
                       ].map(method => (
-                        <label key={method.id} className={`cursor-pointer border rounded-xl p-3 flex flex-col items-center text-center gap-2 transition-all ${joinForm.paymentMethod === method.id ? 'border-primary-500 bg-primary-50 text-primary-700 ring-1 ring-primary-500' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}>
+                        <label key={method.id} className={`cursor-pointer border rounded-2xl p-4 flex flex-col items-center text-center gap-2 transition-all ${
+                          joinForm.paymentMethod === method.id 
+                            ? 'border-primary-500 bg-primary-50 dark:bg-primary-950/20 text-primary-700 dark:text-primary-400 ring-1 ring-primary-500' 
+                            : 'border-slate-200/60 dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-500 hover:bg-slate-50'
+                        }`}>
                           <input type="radio" name="paymentMethod" value={method.id} checked={joinForm.paymentMethod === method.id} onChange={(e) => setJoinForm({...joinForm, paymentMethod: e.target.value})} className="sr-only" />
-                          <method.icon className={`w-6 h-6 ${joinForm.paymentMethod === method.id ? 'text-primary-600' : 'text-slate-400'}`} />
-                          <span className="font-semibold text-xs">{method.label}</span>
+                          <method.icon className={`w-6 h-6 ${joinForm.paymentMethod === method.id ? 'text-primary-500' : 'text-slate-400 dark:text-slate-600'}`} />
+                          <span className="font-extrabold text-[10px] tracking-wide uppercase mt-1">{method.label}</span>
                         </label>
                       ))}
                     </div>
 
                     {joinForm.serviceName && (
-                      <div className="bg-slate-50 rounded-xl p-5 border border-slate-100 flex flex-col gap-2">
-                        <div className="flex justify-between text-sm font-medium text-slate-600">
+                      <motion.div 
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        className="bg-slate-50 dark:bg-slate-800/40 rounded-2xl p-5 border border-slate-100 dark:border-slate-800/20 space-y-2.5"
+                      >
+                        <div className="flex justify-between text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                           <span>Total Consultation Fee</span>
-                          <span>Rs. {joinForm.totalAmount}</span>
+                          <span className="text-slate-800 dark:text-slate-200">Rs. {joinForm.totalAmount}</span>
                         </div>
-                        {joinForm.paymentMethod !== 'cash' && (
-                          <>
-                            <div className="flex justify-between text-sm font-medium text-slate-600">
-                              <span>Pay Now (50% Advance)</span>
-                              <span className="text-primary-600 font-bold">Rs. {joinForm.totalAmount / 2}</span>
-                            </div>
-                            <div className="flex justify-between text-sm font-medium text-slate-600">
-                              <span>Pay at Clinic</span>
-                              <span>Rs. {joinForm.totalAmount / 2}</span>
-                            </div>
-                          </>
-                        )}
-                      </div>
+                        <div className="flex justify-between text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider pt-2 border-t border-slate-200/50">
+                          <span>Pay Now (50% Advance)</span>
+                          <span className="text-primary-600 dark:text-primary-400 text-sm font-black">Rs. {joinForm.totalAmount / 2}</span>
+                        </div>
+                        <div className="flex justify-between text-[10px] font-semibold text-slate-400 dark:text-slate-500 italic">
+                          <span>*Remaining Rs. {joinForm.totalAmount / 2} will be paid at clinical reception.</span>
+                        </div>
+                      </motion.div>
                     )}
                   </div>
                 </div>
 
-                <button
+                <motion.button
+                  whileHover={{ scale: 1.01 }}
+                  whileTap={{ scale: 0.99 }}
                   type="submit"
                   disabled={loading || !joinForm.serviceName}
-                  className="w-full bg-primary-600 text-white py-4 rounded-xl font-bold text-[15px] hover:bg-primary-700 hover:shadow-lg hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:pointer-events-none mt-4"
+                  className="w-full bg-primary-500 text-white py-4 rounded-2xl font-extrabold text-sm hover:bg-primary-600 hover:shadow-glow hover:shadow-primary-500/10 transition-all disabled:opacity-50 disabled:pointer-events-none mt-4"
                 >
-                  {loading ? 'Processing...' : 'Confirm & Book Appointment'}
-                </button>
+                  {loading ? 'Securing booking gateway...' : 'Confirm & Secure Booking'}
+                </motion.button>
               </form>
             </div>
           </motion.div>
         )}
 
-        {/* QUEUE STATUS TAB */}
+        {/* ==================== QUEUE STATUS TAB ==================== */}
         {activeTab === 'status' && (
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="max-w-2xl mx-auto">
-            <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-8">
-              <div className="flex justify-between items-center mb-8">
-                <div>
-                  <h2 className="text-2xl font-bold text-slate-800 tracking-tight">Queue Status</h2>
-                  <p className="text-slate-500 text-sm mt-1">Real-time updates for your appointment</p>
+          <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} className="max-w-2xl mx-auto">
+            <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-md border border-slate-200/50 dark:border-slate-800 p-8 sm:p-10 relative overflow-hidden">
+              <div className="absolute top-[5%] left-[5%] w-44 h-44 rounded-full bg-indigo-500/5 blur-3xl pointer-events-none"></div>
+              
+              <div className="flex justify-between items-center mb-8 relative z-10">
+                <div className="flex items-center gap-3">
+                  <div className="w-11 h-11 bg-primary-500/10 rounded-2xl flex items-center justify-center border border-primary-500/10">
+                    <Clock className="w-6 h-6 text-primary-500 animate-spin" />
+                  </div>
+                  <div>
+                    <h2 className="text-2xl font-black text-slate-800 dark:text-slate-100 tracking-tight">Queue Status</h2>
+                    <p className="text-slate-400 dark:text-slate-500 text-xs font-semibold uppercase tracking-wider">Real-time consultation details</p>
+                  </div>
                 </div>
-                <button
+                
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
                   onClick={fetchQueueStatus}
-                  className="p-2.5 bg-slate-50 text-slate-600 hover:text-primary-600 rounded-xl border border-slate-200 hover:border-primary-200 transition-colors"
-                  title="Refresh"
+                  className="p-3 bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-primary-500 rounded-xl border border-slate-200/60 dark:border-slate-800 hover:border-primary-300 transition-colors shadow-xs"
+                  title="Refresh status"
                 >
-                  <RefreshCw className="w-5 h-5" />
-                </button>
+                  <RefreshCw className="w-4 h-4" />
+                </motion.button>
               </div>
 
               {queueStatus ? (
-                <div className="space-y-6">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="bg-slate-50 border border-slate-100 rounded-2xl p-6 text-center">
-                      <div className="text-5xl font-black text-slate-800">{queueStatus.yourToken}</div>
-                      <div className="text-sm font-medium text-slate-500 uppercase tracking-wider mt-2">Your Token</div>
-                    </div>
-                    <div className="bg-primary-50 border border-primary-100 rounded-2xl p-6 text-center">
-                      <div className="text-5xl font-black text-primary-600">{queueStatus.currentServing}</div>
-                      <div className="text-sm font-medium text-primary-600 uppercase tracking-wider mt-2">Serving</div>
-                    </div>
-                  </div>
-
-                  <div className="flex gap-4">
-                    <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4 flex-1 text-center">
-                      <div className="text-2xl font-bold text-slate-700">{queueStatus.peopleAhead}</div>
-                      <div className="text-xs font-medium text-slate-500 uppercase tracking-wider mt-1">Ahead</div>
-                    </div>
-                    <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4 flex-1 text-center">
-                      <div className="text-2xl font-bold text-slate-700">{queueStatus.estimatedTime}m</div>
-                      <div className="text-xs font-medium text-slate-500 uppercase tracking-wider mt-1">Est. Wait</div>
+                <div className="space-y-6 relative z-10">
+                  {/* Proximity visual alert block */}
+                  <div className={`p-4.5 rounded-2xl border flex items-start gap-4 ${
+                    queueStatus.peopleAhead === 0 ? 'bg-emerald-50/80 border-emerald-200/50 text-emerald-800' : 
+                    queueStatus.peopleAhead <= 2 ? 'bg-rose-50/80 border-rose-200/50 text-rose-800' : 
+                    queueStatus.peopleAhead <= 5 ? 'bg-amber-50/80 border-amber-200/50 text-amber-800' : 
+                    'bg-slate-50/80 border-slate-200/50 text-slate-700'
+                  }`}>
+                    {queueStatus.peopleAhead <= 2 ? <ShieldAlert className="w-5 h-5 mt-0.5 shrink-0" /> : <CheckCircle2 className="w-5 h-5 mt-0.5 shrink-0" />}
+                    <div>
+                      <div className="text-[10px] font-black uppercase tracking-wider leading-none mb-1">Live Status Notification</div>
+                      <p className="text-xs font-bold leading-relaxed">{ticketStyle.statusLabel}</p>
                     </div>
                   </div>
 
-                  <div className="bg-slate-50 rounded-2xl p-5 border border-slate-100">
-                    <div className="flex justify-between items-center mb-3">
-                      <span className="font-semibold text-slate-600">Current Status</span>
-                      <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
-                        queueStatus.status === 'serving' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
-                      }`}>
-                        {queueStatus.status === 'serving' ? 'Your Turn' : 'Waiting'}
+                  {/* Layout Grid details */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800/40 p-5 rounded-[1.5rem] space-y-1">
+                      <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest block">Consultant Specialist</span>
+                      <h4 className="text-xl font-black text-slate-800 dark:text-slate-100">Dr. {queueStatus.serviceName}</h4>
+                      <span className="inline-block text-[10px] font-black text-primary-500 bg-primary-50 dark:bg-primary-950/20 border border-primary-500/10 px-2 py-0.5 rounded-md mt-2">
+                        Token #{queueStatus.yourToken}
                       </span>
                     </div>
-                    <div className="flex justify-between items-center">
-                      <span className="font-semibold text-slate-600">Priority Level</span>
-                      <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
-                        queueStatus.priority === 'emergency' ? 'bg-red-100 text-red-700' : 'bg-slate-200 text-slate-700'
-                      }`}>
-                        {queueStatus.priority === 'emergency' ? 'Emergency' : 'Normal'}
+
+                    <div className="bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800/40 p-5 rounded-[1.5rem] flex items-center justify-between">
+                      <div className="space-y-1">
+                        <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest block">Estimated Arrival</span>
+                        <div className="text-2xl font-black text-primary-600 dark:text-primary-400">
+                          {new Date(Date.now() + queueStatus.estimatedTime * 60 * 1000).toLocaleTimeString('en-US', {
+                            hour: '2-digit', minute: '2-digit', hour12: true
+                          })}
+                        </div>
+                      </div>
+                      <div className="p-3 bg-white dark:bg-slate-900 border border-slate-200/50 dark:border-slate-800 rounded-xl shadow-xs">
+                        <Clock className="w-6 h-6 text-primary-500" />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Progress statistics list */}
+                  <div className="bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800/40 p-6 rounded-[2.5rem] space-y-4">
+                    <div className="flex justify-between items-center text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                      <span className="flex items-center gap-2"><Users className="w-4.5 h-4.5" /> Remaining Patients ahead:</span>
+                      <span className="font-extrabold text-slate-800 dark:text-slate-100 bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 px-3 py-1 rounded-xl shadow-xs">
+                        {queueStatus.peopleAhead} ahead
+                      </span>
+                    </div>
+                    
+                    <div className="flex justify-between items-center text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider pt-3 border-t border-slate-200/50 dark:border-slate-800/60">
+                      <span className="flex items-center gap-2"><Hourglass className="w-4.5 h-4.5" /> Est. wait to consult:</span>
+                      <span className="font-extrabold text-slate-800 dark:text-slate-100 bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 px-3 py-1 rounded-xl shadow-xs">
+                        {queueStatus.estimatedTime} minutes
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between items-center text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider pt-3 border-t border-slate-200/50 dark:border-slate-800/60">
+                      <span className="flex items-center gap-2"><Clock className="w-4.5 h-4.5" /> Now Serving Token:</span>
+                      <span className="font-black text-indigo-500 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/20 border border-indigo-500/10 px-3.5 py-1 rounded-xl shadow-xs">
+                        Token #{queueStatus.currentServing}
                       </span>
                     </div>
                   </div>
 
-                  <button
+                  <motion.button
+                    whileHover={{ scale: 1.01 }}
+                    whileTap={{ scale: 0.99 }}
                     onClick={handleCancelQueue}
-                    className="w-full bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 py-3.5 rounded-xl font-bold transition-colors mt-4"
+                    className="w-full text-center text-rose-500 hover:text-rose-600 dark:text-rose-400 font-extrabold text-xs py-4 rounded-2xl bg-rose-50/40 hover:bg-rose-50/80 dark:bg-rose-950/10 border border-rose-200/10 transition-colors"
                   >
-                    Cancel Queue
-                  </button>
+                    Cancel Appointment & Leave Queue
+                  </motion.button>
                 </div>
               ) : (
-                <div className="text-center py-12">
-                  <div className="w-20 h-20 bg-slate-50 text-slate-300 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <Activity className="w-10 h-10" />
+                <div className="py-12 text-center space-y-4">
+                  <div className="w-16 h-16 bg-slate-50 dark:bg-slate-800 text-slate-300 dark:text-slate-700 rounded-full flex items-center justify-center mx-auto shadow-inner">
+                    <AlertCircle className="w-8 h-8" />
                   </div>
-                  <h3 className="text-lg font-bold text-slate-800">No active queue</h3>
-                  <p className="text-slate-500 mt-2">You are not currently waiting for any doctor.</p>
+                  <div>
+                    <h3 className="text-xl font-bold text-slate-800 dark:text-slate-200">No active queue tracker</h3>
+                    <p className="text-slate-400 dark:text-slate-500 text-xs font-semibold mt-1">Aap abhi kisi queue line mein active nahi hain.</p>
+                  </div>
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => handleTabChange('book')}
+                    className="bg-primary-500 text-white px-6 py-3 rounded-2xl font-extrabold text-xs tracking-wider uppercase mt-4 hover:bg-primary-600"
+                  >
+                    Join a Queue
+                  </motion.button>
                 </div>
               )}
             </div>
           </motion.div>
         )}
 
-        {/* HISTORY TAB */}
+        {/* ==================== VISIT HISTORY TAB ==================== */}
         {activeTab === 'history' && (
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="max-w-4xl mx-auto">
-            <h2 className="text-2xl font-bold text-slate-800 mb-6">Visit History</h2>
-            {history.length === 0 ? (
-              <div className="bg-white rounded-3xl border border-slate-200 p-12 text-center">
-                <History className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-                <h3 className="text-lg font-bold text-slate-800">No past visits</h3>
-                <p className="text-slate-500">Your completed and cancelled appointments will appear here.</p>
-              </div>
-            ) : (
+          <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+            <div className="text-left">
+              <h2 className="text-3xl font-black text-slate-800 dark:text-slate-100 tracking-tight">Visit History</h2>
+              <p className="text-slate-400 dark:text-slate-500 font-semibold text-sm mt-1">Timeline logs of all checkups and slot payments.</p>
+            </div>
+
+            {history.length > 0 ? (
               <div className="space-y-4">
-                {history.map((item, index) => (
-                  <div key={index} className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                    <div className="flex gap-4">
-                      <div className="w-12 h-12 bg-slate-50 text-slate-500 rounded-full flex items-center justify-center shrink-0">
-                        <CalendarPlus className="w-5 h-5" />
+                {history.map((item, idx) => (
+                  <motion.div 
+                    key={item._id || idx} 
+                    whileHover={{ x: 4 }}
+                    className="bg-white dark:bg-slate-900 border border-slate-200/50 dark:border-slate-800/80 rounded-3xl p-6 shadow-xs flex flex-col md:flex-row justify-between items-start md:items-center gap-6"
+                  >
+                    <div className="flex items-start gap-4">
+                      <div className="w-12 h-12 bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 rounded-2xl flex items-center justify-center shrink-0 border border-slate-200/40">
+                        <Calendar className="w-6 h-6" />
                       </div>
                       <div>
-                        <h4 className="font-bold text-slate-800 text-lg">Dr. {item.serviceName}</h4>
-                        <p className="text-slate-500 font-medium text-sm mt-0.5">{new Date(item.createdAt).toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'long', day: 'numeric' })}</p>
-                        <p className="text-slate-400 text-sm mt-1">Token: #{item.tokenNumber}</p>
+                        <h4 className="font-extrabold text-slate-800 dark:text-slate-100 text-base leading-tight">Dr. {item.serviceName}</h4>
+                        <p className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mt-1">
+                          Appointment Date: <span className="text-slate-600 dark:text-slate-300 font-bold">{new Date(item.appointmentDate).toLocaleDateString('en-US', { dateStyle: 'medium' })}</span>
+                        </p>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 font-semibold mt-1">Token #{item.tokenNumber} • {item.notes || 'Routine Clinic visit checkup.'}</p>
                       </div>
                     </div>
-                    <div className="flex sm:flex-col gap-2 sm:items-end w-full sm:w-auto">
-                      <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
-                        item.status === 'cancelled' ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'
+
+                    <div className="flex items-center gap-3">
+                      <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${
+                        item.status === 'completed' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
                       }`}>
-                        {item.status === 'cancelled' ? 'Cancelled' : 'Completed'}
+                        {item.status}
                       </span>
                     </div>
-                  </div>
+                  </motion.div>
                 ))}
+              </div>
+            ) : (
+              <div className="bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 rounded-[2.5rem] p-12 text-center">
+                <div className="w-16 h-16 bg-slate-50 dark:bg-slate-800 text-slate-300 dark:text-slate-700 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <History className="w-8 h-8" />
+                </div>
+                <h3 className="text-lg font-bold text-slate-800 dark:text-slate-200">No past checkup history</h3>
+                <p className="text-slate-400 dark:text-slate-500 text-xs font-semibold mt-1">Aapki abhi tak koi past clinical verification history nahi hai.</p>
               </div>
             )}
           </motion.div>
         )}
 
-        {/* MEDICAL REPORTS TAB */}
+        {/* ==================== MEDICAL REPORTS TAB ==================== */}
         {activeTab === 'reports' && (
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="max-w-4xl mx-auto">
-            <h2 className="text-2xl font-bold text-slate-800 mb-6">Medical Reports</h2>
-            {reports.length === 0 ? (
-              <div className="bg-white rounded-3xl border border-slate-200 p-12 text-center">
-                <FileText className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-                <h3 className="text-lg font-bold text-slate-800">No medical reports</h3>
-                <p className="text-slate-500">Prescriptions and diagnosis reports will be available here after visits.</p>
+          <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+            <div className="text-left">
+              <h2 className="text-3xl font-black text-slate-800 dark:text-slate-100 tracking-tight">Medical Reports</h2>
+              <p className="text-slate-400 dark:text-slate-500 font-semibold text-sm mt-1">Download and view diagnostic checkup files.</p>
+            </div>
+
+            {reports.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {reports.map((report, idx) => (
+                  <motion.div 
+                    key={report._id || idx} 
+                    whileHover={{ y: -4 }}
+                    className="bg-white dark:bg-slate-900 border border-slate-200/50 dark:border-slate-800/80 rounded-[2rem] p-6 shadow-xs relative overflow-hidden group"
+                  >
+                    <div className="flex items-start gap-4">
+                      <div className="w-12 h-12 bg-primary-50 dark:bg-primary-950/20 text-primary-500 rounded-2xl flex items-center justify-center shrink-0 border border-primary-500/10">
+                        <FileText className="w-6 h-6" />
+                      </div>
+                      <div className="space-y-1">
+                        <h4 className="font-extrabold text-slate-800 dark:text-slate-100 text-base leading-tight group-hover:text-primary-500 transition-colors">{report.fileName || 'Diagnostic Report'}</h4>
+                        <span className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest block">Doctor: Dr. {report.doctorId?.name || 'Specialist'}</span>
+                        <span className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest block">Date: {new Date(report.createdAt).toLocaleDateString('en-US', { dateStyle: 'medium' })}</span>
+                      </div>
+                    </div>
+
+                    <div className="mt-6 pt-4 border-t border-slate-200/50 dark:border-slate-800 flex justify-end">
+                      <a 
+                        href={`http://localhost:5000${report.filePath}`}
+                        download
+                        target="_blank"
+                        rel="noreferrer"
+                        className="bg-slate-50 dark:bg-slate-800 hover:bg-primary-500 dark:hover:bg-primary-500 text-slate-600 dark:text-slate-400 hover:text-white dark:hover:text-white px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center gap-2 border border-slate-200/60 dark:border-slate-800 transition duration-300 shadow-xs"
+                      >
+                        <FileDown className="w-4 h-4" /> Download PDF
+                      </a>
+                    </div>
+                  </motion.div>
+                ))}
               </div>
             ) : (
-              <div className="grid gap-6">
-                {reports.map((report, index) => (
-                  <div key={index} className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
-                    <div className="bg-slate-50 border-b border-slate-200 px-6 py-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-                      <div>
-                        <h4 className="font-bold text-slate-800 text-lg">{report.diagnosis}</h4>
-                        <p className="text-primary-600 font-medium text-sm flex items-center gap-1.5 mt-1">
-                          <User className="w-3.5 h-3.5" /> Dr. {report.doctor?.name}
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-slate-500 text-sm font-medium">{new Date(report.createdAt).toLocaleDateString()}</p>
-                        {report.followUp && (
-                          <span className="inline-block bg-orange-100 text-orange-700 text-xs px-2.5 py-1 rounded-md font-bold mt-2">
-                            Follow Up Required
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="p-6 space-y-6">
-                      {report.symptoms && (
-                        <div>
-                          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Symptoms</p>
-                          <p className="text-slate-700 bg-slate-50 p-4 rounded-xl text-sm border border-slate-100">{report.symptoms}</p>
-                        </div>
-                      )}
-
-                      {report.prescription?.length > 0 && (
-                        <div>
-                          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Prescription</p>
-                          <div className="grid gap-2">
-                            {report.prescription.map((med, i) => (
-                              <div key={i} className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6 bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm">
-                                <span className="font-bold text-slate-800 min-w-[150px] flex items-center gap-2">
-                                  <div className="w-2 h-2 rounded-full bg-primary-500"></div>
-                                  {med.medicineName}
-                                </span>
-                                <span className="text-slate-600 font-medium">{med.dosage}</span>
-                                <span className="text-slate-500">{med.frequency}</span>
-                                <span className="text-slate-500 bg-slate-100 px-2.5 py-0.5 rounded-md text-xs font-semibold">{med.duration}</span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {report.doctorNotes && (
-                        <div>
-                          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Doctor Notes</p>
-                          <p className="text-slate-700 bg-amber-50 p-4 rounded-xl text-sm border border-amber-100/50">{report.doctorNotes}</p>
-                        </div>
-                      )}
-
-                      {report.nextAppointment && (
-                        <div className="flex items-center gap-3 text-sm font-medium text-slate-700 bg-blue-50/50 p-4 rounded-xl border border-blue-100/50">
-                          <CalendarPlus className="w-5 h-5 text-blue-500" />
-                          Next Appointment: <strong className="text-slate-900">{new Date(report.nextAppointment).toLocaleDateString()}</strong>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ))}
+              <div className="bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 rounded-[2.5rem] p-12 text-center">
+                <div className="w-16 h-16 bg-slate-50 dark:bg-slate-800 text-slate-300 dark:text-slate-700 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <FileText className="w-8 h-8" />
+                </div>
+                <h3 className="text-lg font-bold text-slate-800 dark:text-slate-200">No medical reports issued</h3>
+                <p className="text-slate-400 dark:text-slate-500 text-xs font-semibold mt-1">Iss clinic checkup ki reports abhi tak publish nahi ki gayi hain.</p>
               </div>
             )}
           </motion.div>
         )}
       </main>
 
-      {/* Floating Persistent Live Queue Card */}
+      {/* Persistent printable checkout receipts */}
+      <AnimatePresence>
+        {showReceipt && receiptData && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 backdrop-blur-sm p-4 overflow-y-auto"
+          >
+            <motion.div 
+              initial={{ scale: 0.9, y: 30 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.9, y: 30 }}
+              className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-[2.5rem] shadow-2xl p-8 relative border border-slate-100 dark:border-slate-800"
+            >
+              <AppointmentReceipt 
+                receipt={receiptData} 
+                onClose={() => {
+                  setShowReceipt(false);
+                  setReceiptData(null);
+                }} 
+              />
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Permanent floating live card overlay for active tokens tracking */}
       <LiveQueueCard queueStatus={queueStatus} onCancel={handleCancelQueue} />
     </div>
   );

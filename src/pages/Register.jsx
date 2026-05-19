@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { register } from '../services/api';
 import { motion } from 'framer-motion';
-import { HeartPulse, Mail, Lock, User, Phone, ArrowRight, AlertCircle, Loader2 } from 'lucide-react';
+import { HeartPulse, Mail, Lock, User, Phone, ArrowRight, AlertCircle, Loader2, Users, Star, Clock } from 'lucide-react';
 
 const Register = () => {
   const [formData, setFormData] = useState({
@@ -30,58 +30,145 @@ const Register = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 relative overflow-hidden py-10">
-      {/* Background Decorative Elements */}
-      <div className="absolute top-0 left-0 w-full h-full overflow-hidden z-0 pointer-events-none">
-        <div className="absolute -top-[10%] -right-[5%] w-96 h-96 rounded-full bg-primary-100 opacity-50 blur-3xl"></div>
-        <div className="absolute bottom-[10%] -left-[10%] w-[30rem] h-[30rem] rounded-full bg-secondary-100 opacity-50 blur-3xl"></div>
-      </div>
-
-      <motion.div 
-        initial={{ opacity: 0, y: 30 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6, ease: "easeOut" }}
-        className="bg-white rounded-3xl shadow-soft w-full max-w-md overflow-hidden z-10 border border-slate-100"
-      >
-        {/* Header */}
-        <div className="bg-gradient-to-br from-primary-600 to-primary-800 p-8 text-center relative overflow-hidden">
-          <div className="absolute inset-0 bg-primary-900 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]"></div>
+    <div className="min-h-screen grid grid-cols-1 lg:grid-cols-12 bg-slate-50 dark:bg-slate-950 overflow-hidden font-sans">
+      
+      {/* LEFT COLUMN: Premium Clinical Hero Showcase */}
+      <div className="hidden lg:flex lg:col-span-7 bg-gradient-to-tr from-slate-900 via-teal-950 to-indigo-950 relative flex-col justify-between p-12 text-white overflow-hidden">
+        {/* Dynamic backdrop reflection grids */}
+        <div className="absolute inset-0 opacity-10 bg-[radial-gradient(#ffffff_1px,transparent_1px)] [background-size:24px_24px] pointer-events-none"></div>
+        <div className="absolute -top-[20%] -left-[10%] w-[40rem] h-[40rem] rounded-full bg-teal-500/10 opacity-60 blur-3xl"></div>
+        <div className="absolute top-[40%] -right-[15%] w-[40rem] h-[40rem] rounded-full bg-indigo-500/10 opacity-60 blur-3xl"></div>
+        
+        {/* Logo and Brand Header */}
+        <div className="flex items-center gap-3 relative z-10">
           <motion.div 
             initial={{ scale: 0.8 }}
             animate={{ scale: 1 }}
-            transition={{ type: "spring", stiffness: 200, delay: 0.2 }}
-            className="w-16 h-16 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center mx-auto mb-4 border border-white/30 shadow-glow"
+            transition={{ type: "spring", stiffness: 200 }}
+            className="w-12 h-12 bg-teal-500/20 backdrop-blur-md rounded-2xl flex items-center justify-center border border-white/20 shadow-glow"
           >
-            <HeartPulse className="w-8 h-8 text-white" />
+            <HeartPulse className="w-6 h-6 text-teal-400" />
           </motion.div>
-          <h1 className="text-2xl font-bold text-white tracking-tight relative z-10">City Medical Clinic</h1>
-          <p className="text-primary-100 text-sm mt-1 font-medium relative z-10">Premium Queue Management</p>
+          <div>
+            <h1 className="text-xl font-black tracking-tight leading-none">City Medical</h1>
+            <span className="text-[10px] font-bold text-teal-400 uppercase tracking-widest leading-none">Smart Queue Center</span>
+          </div>
         </div>
 
-        {/* Form */}
-        <div className="p-8">
-          <div className="mb-8">
-            <h2 className="text-2xl font-bold text-slate-800 tracking-tight">Create Account</h2>
-            <p className="text-slate-500 text-sm mt-1">Register to book and manage appointments</p>
+        {/* Hero Central Branding Message */}
+        <div className="my-auto space-y-6 relative z-10 max-w-xl">
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="inline-flex items-center gap-2 bg-white/5 border border-white/10 px-3 py-1.5 rounded-full text-xs font-bold tracking-wide"
+          >
+            <span className="flex h-2 w-2 relative">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-teal-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-teal-500"></span>
+            </span>
+            Instant queue booking & slot confirmation
+          </motion.div>
+
+          <motion.h2 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            className="text-4.5xl font-black leading-[1.1] tracking-tight"
+          >
+            Your health journey, <br/>
+            <span className="shimmer-text">fully digitalized.</span>
+          </motion.h2>
+
+          <motion.p 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 }}
+            className="text-slate-300 font-medium leading-relaxed text-[15px]"
+          >
+            Naya account banayein aur doctor appointments, medical reports, and real-time live queue logs ko apne desktop ya mobile dashboard se direct manage karein.
+          </motion.p>
+
+          {/* Glowing Metrics Cards Grid */}
+          <div className="grid grid-cols-3 gap-4 pt-6">
+            <motion.div 
+              whileHover={{ y: -4 }}
+              className="bg-white/5 backdrop-blur-sm border border-white/5 p-4 rounded-2xl"
+            >
+              <Users className="w-5 h-5 text-teal-400 mb-2" />
+              <div className="text-2xl font-black tracking-tight">10k+</div>
+              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Tokens Served</div>
+            </motion.div>
+            <motion.div 
+              whileHover={{ y: -4 }}
+              className="bg-white/5 backdrop-blur-sm border border-white/5 p-4 rounded-2xl"
+            >
+              <Star className="w-5 h-5 text-amber-400 mb-2" />
+              <div className="text-2xl font-black tracking-tight">99.8%</div>
+              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Care Quality</div>
+            </motion.div>
+            <motion.div 
+              whileHover={{ y: -4 }}
+              className="bg-white/5 backdrop-blur-sm border border-white/5 p-4 rounded-2xl"
+            >
+              <Clock className="w-5 h-5 text-sky-400 mb-2" />
+              <div className="text-2xl font-black tracking-tight">~15m</div>
+              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Avg Wait</div>
+            </motion.div>
+          </div>
+        </div>
+
+        {/* Footer Brand tagline */}
+        <p className="text-slate-500 text-xs font-semibold tracking-wide relative z-10">
+          © 2026 City Medical Clinic. Engineered for perfect health journeys.
+        </p>
+      </div>
+
+      {/* RIGHT COLUMN: Modern High-Fidelity Register Form Panel */}
+      <div className="lg:col-span-5 flex items-center justify-center p-8 bg-slate-50 dark:bg-slate-950 relative overflow-y-auto max-h-screen">
+        {/* Background bubbles */}
+        <div className="absolute top-[10%] right-[10%] w-60 h-60 rounded-full bg-teal-500/5 blur-3xl pointer-events-none"></div>
+        <div className="absolute bottom-[10%] left-[10%] w-72 h-72 rounded-full bg-indigo-500/5 blur-3xl pointer-events-none"></div>
+
+        <motion.div 
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, ease: "easeOut" }}
+          className="w-full max-w-[24rem] space-y-8 z-10 py-6"
+        >
+          {/* Header Mobile Brand */}
+          <div className="flex lg:hidden flex-col items-center text-center space-y-2">
+            <div className="w-12 h-12 bg-primary-500/10 rounded-2xl flex items-center justify-center border border-primary-500/20 shadow-glow">
+              <HeartPulse className="w-6 h-6 text-primary-500" />
+            </div>
+            <h1 className="text-2xl font-black text-slate-800 dark:text-slate-100 tracking-tight">City Medical Clinic</h1>
+            <p className="text-slate-400 text-xs font-semibold uppercase tracking-widest">Smart Queue Center</p>
+          </div>
+
+          {/* Form Header */}
+          <div className="text-left">
+            <h2 className="text-3xl font-black text-slate-800 dark:text-slate-100 tracking-tight leading-none">Create Account</h2>
+            <p className="text-slate-400 dark:text-slate-500 text-sm font-semibold mt-2">Register to book and manage appointments</p>
           </div>
 
           {error && (
             <motion.div 
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: 'auto' }}
-              className="bg-red-50 border-l-4 border-red-500 text-red-700 p-4 rounded-md mb-6 flex items-start gap-3"
+              className="bg-red-50 dark:bg-red-950/20 border border-red-200/50 dark:border-red-500/20 text-red-700 dark:text-red-300 p-4 rounded-2xl flex items-start gap-3 shadow-xs"
             >
-              <AlertCircle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
-              <p className="text-sm font-medium">{error}</p>
+              <AlertCircle className="w-5 h-5 text-red-500 dark:text-red-400 shrink-0 mt-0.5" />
+              <p className="text-xs font-bold leading-relaxed">{error}</p>
             </motion.div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-5">
-            <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1.5">Full Name</label>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Full Name */}
+            <div className="space-y-1.5">
+              <label className="block text-[11px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest pl-1">Full Name</label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
-                  <User className="h-5 w-5 text-slate-400" />
+                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                  <User className="h-5 w-5 text-slate-400 dark:text-slate-600" />
                 </div>
                 <input
                   type="text"
@@ -90,16 +177,17 @@ const Register = () => {
                   onChange={handleChange}
                   placeholder="John Doe"
                   required
-                  className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all text-slate-700"
+                  className="w-full pl-11 pr-4 py-3 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary-500 dark:focus:ring-primary-500 focus:border-transparent focus:bg-white dark:focus:bg-slate-900 shadow-xs text-slate-800 dark:text-slate-100 font-medium transition duration-200 text-[14px]"
                 />
               </div>
             </div>
 
-            <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1.5">Email Address</label>
+            {/* Email Address */}
+            <div className="space-y-1.5">
+              <label className="block text-[11px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest pl-1">Email Address</label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
-                  <Mail className="h-5 w-5 text-slate-400" />
+                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                  <Mail className="h-5 w-5 text-slate-400 dark:text-slate-600" />
                 </div>
                 <input
                   type="email"
@@ -108,16 +196,17 @@ const Register = () => {
                   onChange={handleChange}
                   placeholder="name@example.com"
                   required
-                  className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all text-slate-700"
+                  className="w-full pl-11 pr-4 py-3 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary-500 dark:focus:ring-primary-500 focus:border-transparent focus:bg-white dark:focus:bg-slate-900 shadow-xs text-slate-800 dark:text-slate-100 font-medium transition duration-200 text-[14px]"
                 />
               </div>
             </div>
 
-            <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1.5">Phone Number</label>
+            {/* Phone Number */}
+            <div className="space-y-1.5">
+              <label className="block text-[11px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest pl-1">Phone Number</label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
-                  <Phone className="h-5 w-5 text-slate-400" />
+                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                  <Phone className="h-5 w-5 text-slate-400 dark:text-slate-600" />
                 </div>
                 <input
                   type="text"
@@ -126,16 +215,17 @@ const Register = () => {
                   onChange={handleChange}
                   placeholder="03001234567"
                   required
-                  className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all text-slate-700"
+                  className="w-full pl-11 pr-4 py-3 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary-500 dark:focus:ring-primary-500 focus:border-transparent focus:bg-white dark:focus:bg-slate-900 shadow-xs text-slate-800 dark:text-slate-100 font-medium transition duration-200 text-[14px]"
                 />
               </div>
             </div>
 
-            <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1.5">Password</label>
+            {/* Password */}
+            <div className="space-y-1.5">
+              <label className="block text-[11px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest pl-1">Password</label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
-                  <Lock className="h-5 w-5 text-slate-400" />
+                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                  <Lock className="h-5 w-5 text-slate-400 dark:text-slate-600" />
                 </div>
                 <input
                   type="password"
@@ -146,40 +236,45 @@ const Register = () => {
                   required
                   minLength={6}
                   autoComplete="new-password"
-                  className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all text-slate-700"
+                  className="w-full pl-11 pr-4 py-3 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary-500 dark:focus:ring-primary-500 focus:border-transparent focus:bg-white dark:focus:bg-slate-900 shadow-xs text-slate-800 dark:text-slate-100 font-medium transition duration-200 text-[14px]"
                 />
               </div>
             </div>
 
-            <button
+            {/* Submit Button */}
+            <motion.button
+              whileHover={{ scale: 1.01 }}
+              whileTap={{ scale: 0.99 }}
               type="submit"
               disabled={loading}
-              className="w-full bg-primary-600 text-white py-3.5 rounded-xl font-semibold text-[15px] hover:bg-primary-700 hover:shadow-lg hover:shadow-primary-600/30 transition-all duration-300 disabled:opacity-70 disabled:pointer-events-none flex justify-center items-center gap-2 group mt-2"
+              className="w-full bg-primary-500 text-white py-4 rounded-2xl font-extrabold text-sm hover:bg-primary-600 hover:shadow-glow hover:shadow-primary-500/20 active:bg-primary-700 transition duration-300 disabled:opacity-70 disabled:pointer-events-none flex justify-center items-center gap-2 group mt-2 pt-4"
             >
               {loading ? (
                 <>
                   <Loader2 className="w-5 h-5 animate-spin" />
-                  Registering...
+                  Creating Account...
                 </>
               ) : (
                 <>
                   Create Account
-                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform duration-200" />
                 </>
               )}
-            </button>
+            </motion.button>
           </form>
 
-          <div className="mt-8 pt-6 border-t border-slate-100 text-center">
-            <p className="text-slate-500 text-sm">
+          {/* Switch Action */}
+          <div className="text-center pt-2">
+            <p className="text-slate-400 dark:text-slate-500 text-xs font-semibold">
               Already have an account?{' '}
-              <Link to="/login" className="text-primary-600 font-semibold hover:text-primary-700 hover:underline underline-offset-2 transition-colors">
+              <Link to="/login" className="text-primary-500 dark:text-primary-400 font-extrabold hover:text-primary-600 dark:hover:text-primary-300 underline underline-offset-2 transition-colors ml-1">
                 Sign In
               </Link>
             </p>
           </div>
-        </div>
-      </motion.div>
+        </motion.div>
+      </div>
+
     </div>
   );
 };
