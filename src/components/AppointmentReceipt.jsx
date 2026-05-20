@@ -1,6 +1,7 @@
 import React from 'react';
 
-const AppointmentReceipt = ({ data, onClose }) => {
+const AppointmentReceipt = ({ data: inputData, receipt, onClose }) => {
+  const data = inputData || receipt || {};
   const handlePrint = () => {
     window.print();
   };

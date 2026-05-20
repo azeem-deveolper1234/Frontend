@@ -91,7 +91,7 @@ const Login = () => {
             transition={{ delay: 0.4 }}
             className="text-slate-300 font-medium leading-relaxed text-[15px]"
           >
-            Sabar se intezar karne ki zaroorat nahi. Join the live clinic queue from home, track your token in real-time, and get estimated arrivals straight to your device.
+            No need to wait in long, exhausting queues. Join the live clinic queue from home, track your token in real-time, and get estimated arrival alerts straight to your device.
           </motion.p>
 
           {/* Glowing Metrics Cards Grid */}

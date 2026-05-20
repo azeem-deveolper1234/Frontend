@@ -304,19 +304,33 @@ const AdminDashboard = () => {
   };
 
   const openFinalPaymentGateway = (payment, method) => {
-    setError('');
-    clearFinalPayTimers();
-    finalPayContextRef.current = { paymentId: payment._id, method };
-    setFinalPayMeta({
-      method,
-      amount: Number(payment.remainingAmount) || 0,
-      patientName: payment.user?.name || 'Patient'
-    });
-    setFinalPayStep('phone');
-    setFinalPayPhone('');
-    setFinalPayOtp('');
-    setShowFinalPayGateway(true);
-  };
+  setError('');
+  clearFinalPayTimers();
+  if (method === 'cash') {
+    // Direct cash settlement without gateway UI
+    (async () => {
+      try {
+        await completeFinalPayment(payment._id, { method: 'cash' });
+        setMessage(`✅ Cash settlement completed for ${payment.user?.name || 'Patient'}`);
+        fetchPayments();
+      } catch (err) {
+        setError(err.response?.data?.message || 'Cash settlement failed');
+      }
+    })();
+    return;
+  }
+  // For other methods, open the gateway modal
+  finalPayContextRef.current = { paymentId: payment._id, method };
+  setFinalPayMeta({
+    method,
+    amount: Number(payment.remainingAmount) || 0,
+    patientName: payment.user?.name || 'Patient'
+  });
+  setFinalPayStep('phone');
+  setFinalPayPhone('');
+  setFinalPayOtp('');
+  setShowFinalPayGateway(true);
+};
 
   const closeFinalPaymentGateway = () => {
     clearFinalPayTimers();
@@ -329,46 +343,54 @@ const AdminDashboard = () => {
   };
 
   const handleFinalPayGatewayNext = () => {
-    const ctx = finalPayContextRef.current;
-    if (!ctx?.paymentId) return;
-
-    if (finalPayStep === 'phone') {
-      if (!String(finalPayPhone).trim()) {
-        setError(finalPayMeta.method === 'card' ? 'Card number required.' : 'Mobile number required.');
+  if (finalPayStep === 'phone') {
+    // Validate phone/card input based on payment method
+    const cleaned = String(finalPayPhone).replace(/\D/g, '');
+    if (finalPayMeta.method === 'easypaisa' || finalPayMeta.method === 'jazzcash') {
+      if (!/^03\d{9}$/.test(cleaned)) {
+        setError('Please enter a valid 11‑digit mobile number starting with 03.');
         return;
       }
-      setError('');
-      setFinalPayStep('otp');
+    } else if (finalPayMeta.method === 'card') {
+      if (!/^\d{16}$/.test(cleaned)) {
+        setError('Please enter a valid 16‑digit card number.');
+        return;
+      }
+    }
+    setFinalPayPhone(cleaned);
+    setError('');
+    setFinalPayStep('otp');
+    return;
+  }
+  if (finalPayStep === 'otp') {
+    if (!/^\d{4}$/.test(finalPayOtp)) {
+      setError('Please enter the 4‑digit verification code.');
       return;
     }
-
-    if (finalPayStep === 'otp') {
-      if (finalPayOtp.length < 4) {
-        setError('4-digit OTP required.');
-        return;
-      }
-      setError('');
-      setFinalPayStep('processing');
-      clearFinalPayTimers();
-
-      const t1 = setTimeout(() => {
-        setFinalPayStep('success');
-        const t2 = setTimeout(async () => {
-          try {
-            await completeFinalPayment(ctx.paymentId, { method: ctx.method });
-            setMessage(`✅ Remaining Rs. ${finalPayMeta.amount} — ${ctx.method} — ${finalPayMeta.patientName}`);
-            fetchPayments();
-          } catch (err) {
-            setError(err.response?.data?.message || 'Payment failed');
-          } finally {
-            closeFinalPaymentGateway();
-          }
-        }, 1200);
-        finalPayTimersRef.current.push(t2);
-      }, 1800);
-      finalPayTimersRef.current.push(t1);
-    }
-  };
+    setError('');
+    setFinalPayStep('processing');
+    clearFinalPayTimers();
+    const t1 = setTimeout(() => {
+      setFinalPayStep('success');
+      const t2 = setTimeout(async () => {
+        const ctx = finalPayContextRef.current;
+        try {
+          await completeFinalPayment(ctx.paymentId, { method: ctx.method });
+          setMessage(`✅ Remaining Rs. ${finalPayMeta.amount} — ${ctx.method} — ${finalPayMeta.patientName}`);
+          fetchPayments();
+        } catch (err) {
+          setError(err.response?.data?.message || 'Payment failed');
+        } finally {
+          closeFinalPaymentGateway();
+        }
+      }, 1200);
+      finalPayTimersRef.current.push(t2);
+    }, 1800);
+    // Removed duplicate final payment handling block
+    finalPayTimersRef.current.push(t1);
+    return;
+  }
+};
 
   const handleDoctorSubmit = async (e) => {
     e.preventDefault();

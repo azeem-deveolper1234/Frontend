@@ -86,7 +86,7 @@ const Register = () => {
             transition={{ delay: 0.4 }}
             className="text-slate-300 font-medium leading-relaxed text-[15px]"
           >
-            Naya account banayein aur doctor appointments, medical reports, and real-time live queue logs ko apne desktop ya mobile dashboard se direct manage karein.
+            Create a new account to book and manage doctor appointments, medical reports, and real-time live queue status logs directly from your desktop or mobile dashboard.
           </motion.p>
 
           {/* Glowing Metrics Cards Grid */}

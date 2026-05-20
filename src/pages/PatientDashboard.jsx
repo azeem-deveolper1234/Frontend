@@ -319,7 +319,7 @@ const PatientDashboard = () => {
         bg: 'from-emerald-500 via-teal-500 to-emerald-600',
         glow: 'shadow-[0_15px_40px_rgba(16,185,129,0.3)]',
         badge: 'bg-emerald-100 text-emerald-800',
-        statusLabel: 'Aapki bari aa gayi! Proceed Inside 🏃‍♂️'
+        statusLabel: "It's Your Turn Now! Proceed Inside 🏃‍♂️"
       };
     }
     if (peopleAhead <= 2) {
@@ -656,7 +656,7 @@ const PatientDashboard = () => {
                 </div>
                 <h3 className="text-2xl font-black text-slate-800 dark:text-slate-200 tracking-tight">No active queue appointment</h3>
                 <p className="text-slate-400 dark:text-slate-500 font-semibold text-sm mt-2 max-w-md mx-auto leading-relaxed">
-                  Aapki aaj ki koi active appointment nahi hai. Clinic ke specialists se consult karne ke liye niche click karke ticket book karein.
+                  You do not have any active appointments for today. Please click the button below to book a ticket and consult with our clinical specialists.
                 </p>
                 <motion.button
                   whileHover={{ scale: 1.03 }}
@@ -978,7 +978,7 @@ const PatientDashboard = () => {
                   </div>
                   <div>
                     <h3 className="text-xl font-bold text-slate-800 dark:text-slate-200">No active queue tracker</h3>
-                    <p className="text-slate-400 dark:text-slate-500 text-xs font-semibold mt-1">Aap abhi kisi queue line mein active nahi hain.</p>
+                    <p className="text-slate-400 dark:text-slate-500 text-xs font-semibold mt-1">You are not currently active in any clinic queue.</p>
                   </div>
                   <motion.button
                     whileHover={{ scale: 1.02 }}
@@ -1039,7 +1039,7 @@ const PatientDashboard = () => {
                   <History className="w-8 h-8" />
                 </div>
                 <h3 className="text-lg font-bold text-slate-800 dark:text-slate-200">No past checkup history</h3>
-                <p className="text-slate-400 dark:text-slate-500 text-xs font-semibold mt-1">Aapki abhi tak koi past clinical verification history nahi hai.</p>
+                <p className="text-slate-400 dark:text-slate-500 text-xs font-semibold mt-1">You do not have any past clinical checkup or verification history yet.</p>
               </div>
             )}
           </motion.div>
@@ -1092,7 +1092,7 @@ const PatientDashboard = () => {
                   <FileText className="w-8 h-8" />
                 </div>
                 <h3 className="text-lg font-bold text-slate-800 dark:text-slate-200">No medical reports issued</h3>
-                <p className="text-slate-400 dark:text-slate-500 text-xs font-semibold mt-1">Iss clinic checkup ki reports abhi tak publish nahi ki gayi hain.</p>
+                <p className="text-slate-400 dark:text-slate-500 text-xs font-semibold mt-1">The medical reports for this clinic checkup have not been published yet.</p>
               </div>
             )}
           </motion.div>
@@ -1115,7 +1115,7 @@ const PatientDashboard = () => {
               className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-[2.5rem] shadow-2xl p-8 relative border border-slate-100 dark:border-slate-800"
             >
               <AppointmentReceipt 
-                receipt={receiptData} 
+                data={receiptData} 
                 onClose={() => {
                   setShowReceipt(false);
                   setReceiptData(null);
