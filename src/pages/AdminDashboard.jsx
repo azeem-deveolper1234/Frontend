@@ -125,6 +125,20 @@ const AdminDashboard = () => {
     return () => clearFinalPayTimers();
   }, []);
 
+  // Auto-populate currently serving token for the selected doctor
+  useEffect(() => {
+    if (todayStats?.allQueueToday && serviceName) {
+      const serving = todayStats.allQueueToday.find(
+        (q) => q.serviceName === serviceName && q.status === 'serving'
+      );
+      if (serving) {
+        setTokenNumber(serving.tokenNumber.toString());
+      } else {
+        setTokenNumber('');
+      }
+    }
+  }, [todayStats, serviceName]);
+
   const fetchTodayStats = async () => {
     try {
       const res = await api.get('/analytics/today');
@@ -744,7 +758,7 @@ const AdminDashboard = () => {
 
               {/* Patient Details Sliding Overlay */}
               <AnimatePresence>
-                {showDetails && (
+                {sclearhowDetails && (
                   <motion.div 
                     initial={{ opacity: 0, y: 15 }} 
                     animate={{ opacity: 1, y: 0 }} 
@@ -1199,10 +1213,10 @@ const AdminDashboard = () => {
                         <th className="px-6 py-5">Total Fee</th>
                         <th className="px-6 py-5">Paid Advance</th>
                         <th className="px-6 py-5">Outstanding</th>
-                        <th className="px-6 py-5">Advance Mode</th>
-                        <th className="px-6 py-5">Settlement Status</th>
-                        <th className="px-6 py-5">Final Settled By</th>
                         <th className="px-6 py-5 text-center">Settlement Actions</th>
+                        <th className="px-6 py-5">Settlement Status</th>
+                        <th className="px-6 py-5">Advance Mode</th>
+                        <th className="px-6 py-5">Final Settled By</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-850">
@@ -1219,18 +1233,9 @@ const AdminDashboard = () => {
                             <td className="px-6 py-5 font-bold text-slate-200">Rs. {p.totalAmount}</td>
                             <td className="px-6 py-5 text-emerald-400 font-bold">Rs. {p.paidAmount}</td>
                             <td className="px-6 py-5 text-rose-400 font-bold">Rs. {p.remainingAmount}</td>
-                            <td className="px-6 py-5 text-slate-400 text-xs">{advDesc}</td>
-                            <td className="px-6 py-5">
-                              <span className={`inline-flex items-center px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-wider ${
-                                isPending ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                              }`}>
-                                {isPending ? 'Pending Balance' : 'Fully Settled'}
-                              </span>
-                            </td>
-                            <td className="px-6 py-5 text-slate-400 text-xs">{finalDesc || '—'}</td>
                             <td className="px-6 py-5 text-center">
                               {isPending ? (
-                                <div className="flex gap-2 justify-center flex-wrap">
+                                <div className="flex gap-2 justify-center flex-wrap min-w-[180px]">
                                   <button onClick={() => openFinalPaymentGateway(p, 'cash')} className="bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/20 px-3 py-1.5 rounded-xl text-xs font-bold transition">Cash</button>
                                   <button onClick={() => openFinalPaymentGateway(p, 'card')} className="bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/20 border border-indigo-500/20 px-3 py-1.5 rounded-xl text-xs font-bold transition">Card</button>
                                   <button onClick={() => openFinalPaymentGateway(p, 'easypaisa')} className="bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/20 px-3 py-1.5 rounded-xl text-xs font-bold transition">Easypaisa</button>
@@ -1240,6 +1245,15 @@ const AdminDashboard = () => {
                                 <span className="inline-flex items-center gap-1 text-slate-500 text-xs font-bold uppercase tracking-wider"><Check className="w-3.5 h-3.5 text-emerald-400" /> Settled</span>
                               )}
                             </td>
+                            <td className="px-6 py-5">
+                              <span className={`inline-flex items-center px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-wider ${
+                                isPending ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                              }`}>
+                                {isPending ? 'Pending Balance' : 'Fully Settled'}
+                              </span>
+                            </td>
+                            <td className="px-6 py-5 text-slate-400 text-xs">{advDesc}</td>
+                            <td className="px-6 py-5 text-slate-400 text-xs">{finalDesc || '—'}</td>
                           </tr>
                         );
                       })}
