@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  callNextPatient, completeQueue, getAnalyticsToday, getAnalyticsOverall, 
+  callNextPatient, completeQueue, getAnalyticsOverall, 
   getAllPayments, createMedicalReport, getAllUsers, getAllDoctors,
-  getPatientQueue, getQueuePayment, completeFinalPayment, addDoctor,
+  getPatientQueue, completeFinalPayment, addDoctor,
   updateDoctor, deleteDoctor, clearOldData, getPatientClinicHistory
 } from '../services/api';
 
@@ -13,7 +13,7 @@ import {
   LayoutDashboard, Users, UserPlus, Stethoscope, FileText, 
   CreditCard, History, LogOut, CheckCircle2, AlertCircle, 
   Clock, Activity, Trash2, Edit2, Wallet, Banknote, ShieldCheck, 
-  RefreshCw, ChevronRight, X, User, Lock, TrendingUp, Sparkles, AlertTriangle, Check, DollarSign, Calendar
+  RefreshCw, ChevronRight, X, TrendingUp, Sparkles, AlertTriangle, Check
 } from 'lucide-react';
 
 function describeAdvancePayment(p) {
@@ -115,30 +115,6 @@ const AdminDashboard = () => {
     prescription: [{ medicineName: '', dosage: '', frequency: '', duration: '' }]
   });
 
-  useEffect(() => {
-    fetchTodayStats();
-    fetchOverallStats();
-    fetchDoctors(); 
-  }, []);
-
-  useEffect(() => {
-    return () => clearFinalPayTimers();
-  }, []);
-
-  // Auto-populate currently serving token for the selected doctor
-  useEffect(() => {
-    if (todayStats?.allQueueToday && serviceName) {
-      const serving = todayStats.allQueueToday.find(
-        (q) => q.serviceName === serviceName && q.status === 'serving'
-      );
-      if (serving) {
-        setTokenNumber(serving.tokenNumber.toString());
-      } else {
-        setTokenNumber('');
-      }
-    }
-  }, [todayStats, serviceName]);
-
   const fetchTodayStats = async () => {
     try {
       const res = await api.get('/analytics/today');
@@ -171,14 +147,83 @@ const AdminDashboard = () => {
     } catch (err) {}
   };
 
-  const fetchDoctors = async () => {
+  const fetchDoctors = useCallback(async () => {
     try {
       const res = await getAllDoctors();
       setDoctors(res.data);
-      if(res.data.length > 0 && !serviceName) {
-          setServiceName(res.data[0].name);
+      if (res.data.length > 0) {
+        setServiceName((prev) => prev || res.data[0].name);
       }
     } catch (err) {}
+  }, []);
+
+  useEffect(() => {
+    fetchTodayStats();
+    fetchOverallStats();
+    fetchDoctors();
+  }, [fetchDoctors]);
+
+  useEffect(() => {
+    return () => clearFinalPayTimers();
+  }, []);
+
+  // Auto-populate currently serving token for the selected doctor
+  useEffect(() => {
+    if (todayStats?.allQueueToday && serviceName) {
+      const serving = todayStats.allQueueToday.find(
+        (q) => q.serviceName === serviceName && q.status === 'serving'
+      );
+      if (serving) {
+        setTokenNumber(serving.tokenNumber.toString());
+      } else {
+        setTokenNumber('');
+      }
+    }
+  }, [todayStats, serviceName]);
+
+  const isDoctor = user?.role === 'doctor';
+
+  useEffect(() => {
+    if (isDoctor && doctors.length > 0) {
+      const myDoc = doctors.find(d => d.email === user.email || d._id === user.doctorId);
+      if (myDoc) {
+        setServiceName(myDoc.name);
+      }
+    }
+  }, [doctors, user, isDoctor]);
+
+  useEffect(() => {
+    if (isDoctor && user?.doctorId) {
+      setReportForm(prev => ({ ...prev, doctorId: user.doctorId }));
+    }
+  }, [user, isDoctor]);
+
+  const handleInlineCall = async (docName) => {
+    setLoading(true);
+    setError('');
+    setMessage('');
+    try {
+      const res = await callNextPatient({ serviceName: docName });
+      setMessage(`✅ Token ${res.data.tokenNumber} called! Priority: ${res.data.priority}`);
+      fetchTodayStats();
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to call patient');
+    }
+    setLoading(false);
+  };
+
+  const handleInlineComplete = async (tNum, docName) => {
+    setLoading(true);
+    setError('');
+    setMessage('');
+    try {
+      const res = await completeQueue({ tokenNumber: tNum, serviceName: docName });
+      setMessage(`✅ Token ${res.data.tokenNumber} completed!`);
+      fetchTodayStats();
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to complete visit');
+    }
+    setLoading(false);
   };
 
   const handleCallNext = async () => {
@@ -454,9 +499,9 @@ const AdminDashboard = () => {
   const tabs = [
     { id: 'dashboard', label: 'Overview', icon: LayoutDashboard },
     { id: 'queue', label: 'Queue Manager', icon: Users },
-    { id: 'doctors', label: 'Manage Doctors', icon: Stethoscope },
-    { id: 'reports', label: 'Medical Reports', icon: FileText },
-    { id: 'payments', label: 'Financial Records', icon: CreditCard },
+    ...(!isDoctor ? [{ id: 'doctors', label: 'Manage Doctors', icon: Stethoscope }] : []),
+    ...(isDoctor ? [{ id: 'reports', label: 'Medical Reports', icon: FileText }] : []),
+    ...(!isDoctor ? [{ id: 'payments', label: 'Financial Records', icon: CreditCard }] : []),
     { id: 'patientHistory', label: 'Patient Lookup', icon: History },
   ];
 
@@ -683,39 +728,43 @@ const AdminDashboard = () => {
           {/* ==================== OVERVIEW TAB ==================== */}
           {activeTab === 'dashboard' && (
             <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
-              
-              {/* Heading Actions Section */}
-              <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-6 bg-slate-900/40 p-6 rounded-[2rem] border border-slate-900">
+                       <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-6 bg-slate-900/40 p-6 rounded-[2rem] border border-slate-900">
                 <div>
                   <h2 className="text-3xl font-black text-slate-100 tracking-tight flex items-center gap-2">
-                    Today's Control Desk <Sparkles className="w-5 h-5 text-indigo-400" />
+                    {isDoctor ? `Dr. ${serviceName}'s Command Center` : "Today's Control Desk"} <Sparkles className="w-5 h-5 text-indigo-400" />
                   </h2>
-                  <p className="text-slate-400 text-sm mt-1 font-medium">Real-time analytical indicators and administration clean-up tools.</p>
+                  <p className="text-slate-400 text-sm mt-1 font-medium">
+                    {isDoctor ? "Real-time patient queue details and clinical commands." : "Real-time analytical indicators and administration clean-up tools."}
+                  </p>
                 </div>
                 
                 <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto">
-                  <div className="flex items-center gap-3 bg-slate-950/80 border border-slate-800 px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-semibold">
-                    <span className="text-slate-400 font-bold whitespace-nowrap">Retention Period:</span>
-                    <select
-                      value={clearRetentionDays}
-                      onChange={(e) => setClearRetentionDays(Number(e.target.value))}
-                      className="bg-slate-900 border-none outline-none focus:ring-0 text-slate-200 font-black cursor-pointer pr-8"
-                    >
-                      {[14, 30, 60, 90, 180].map((d) => (
-                        <option key={d} value={d} className="bg-slate-900">{d} Days</option>
-                      ))}
-                    </select>
-                  </div>
-                  
-                  <motion.button 
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    onClick={handleClearOldData} 
-                    disabled={loading} 
-                    className="px-5 py-3 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 rounded-2xl text-xs sm:text-sm font-extrabold transition flex items-center gap-2 shrink-0"
-                  >
-                    <Trash2 className="w-4.5 h-4.5" /> Purge Old Data
-                  </motion.button>
+                  {!isDoctor && (
+                    <>
+                      <div className="flex items-center gap-3 bg-slate-950/80 border border-slate-800 px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-semibold">
+                        <span className="text-slate-400 font-bold whitespace-nowrap">Retention Period:</span>
+                        <select
+                          value={clearRetentionDays}
+                          onChange={(e) => setClearRetentionDays(Number(e.target.value))}
+                          className="bg-slate-900 border-none outline-none focus:ring-0 text-slate-200 font-black cursor-pointer pr-8"
+                        >
+                          {[14, 30, 60, 90, 180].map((d) => (
+                            <option key={d} value={d} className="bg-slate-900">{d} Days</option>
+                          ))}
+                        </select>
+                      </div>
+                      
+                      <motion.button 
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={handleClearOldData} 
+                        disabled={loading} 
+                        className="px-5 py-3 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 rounded-2xl text-xs sm:text-sm font-extrabold transition flex items-center gap-2 shrink-0"
+                      >
+                        <Trash2 className="w-4.5 h-4.5" /> Purge Old Data
+                      </motion.button>
+                    </>
+                  )}
                   
                   <motion.button 
                     whileHover={{ scale: 1.02 }}
@@ -763,7 +812,7 @@ const AdminDashboard = () => {
                     initial={{ opacity: 0, y: 15 }} 
                     animate={{ opacity: 1, y: 0 }} 
                     exit={{ opacity: 0, y: 15 }} 
-                    className="bg-slate-900 border border-slate-800 rounded-[2.5rem] overflow-hidden"
+                    className="bg-slate-900 border border-slate-800 rounded-[2.5rem] overflow-hidden shadow-2xl"
                   >
                     <div className="px-8 py-5 border-b border-slate-800/80 flex justify-between items-center bg-slate-950/40">
                       <h3 className="font-extrabold text-slate-200 flex items-center gap-2.5 uppercase tracking-wider text-xs sm:text-sm">
@@ -779,15 +828,16 @@ const AdminDashboard = () => {
                       </motion.button>
                     </div>
                     
-                    <div className="overflow-x-auto max-h-[450px]">
-                      <table className="w-full text-left text-sm whitespace-nowrap">
-                        <thead className="bg-slate-950/60 text-slate-400 font-bold uppercase tracking-wider text-[11px] border-b border-slate-850">
+                    <div className="overflow-x-auto max-h-[620px]">
+                      <table className="w-full text-left text-base whitespace-nowrap min-w-[1120px]">
+                        <thead className="bg-slate-950/60 text-slate-300 font-extrabold uppercase tracking-wider text-xs border-b border-slate-850">
                           <tr>
-                            <th className="px-8 py-4">Token Number</th>
-                            <th className="px-8 py-4">Patient Profile</th>
-                            <th className="px-8 py-4">Assigned Consultant</th>
-                            <th className="px-8 py-4">Current Status</th>
-                            <th className="px-8 py-4">Priority Pill</th>
+                            <th className="px-8 py-4.5">Token Number</th>
+                            <th className="px-8 py-4.5">Patient Profile</th>
+                            <th className="px-8 py-4.5">Assigned Consultant</th>
+                            <th className="px-8 py-4.5">Current Status</th>
+                            <th className="px-8 py-4.5">Priority Pill</th>
+                            <th className="px-8 py-4.5 text-center min-w-[170px]">Actions</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-850">
@@ -795,39 +845,42 @@ const AdminDashboard = () => {
                             const dataSource = selectedType === 'Overall' ? overallStats?.allQueueHistory : todayStats?.allQueueToday;
                             if (!dataSource || dataSource.length === 0) return (
                               <tr>
-                                <td colSpan="5" className="px-8 py-12 text-center text-slate-500 italic">
+                                <td colSpan="6" className="px-8 py-12 text-center text-slate-500 italic">
                                   No clinical queue records found.
                                 </td>
                               </tr>
                             );
                             const filtered = dataSource.filter(q => (selectedType === 'all' || selectedType === 'Overall' ? true : selectedType === 'emergency' ? q.priority === 'emergency' : q.status === selectedType));
+                            const sorted = [...filtered].sort((a, b) => (a.tokenNumber || 0) - (b.tokenNumber || 0));
                             if (filtered.length === 0) return (
                               <tr>
-                                <td colSpan="5" className="px-8 py-12 text-center text-slate-500 italic">
+                                <td colSpan="6" className="px-8 py-12 text-center text-slate-400 italic text-sm">
                                   No records match this selective filter today.
                                 </td>
                               </tr>
                             );
-                            return filtered.map((item, idx) => (
+                            return sorted.map((item, idx) => (
                               <tr key={idx} className="hover:bg-slate-900/30 transition-colors">
-                                <td className="px-8 py-4 font-black text-indigo-400 text-lg">#{item.tokenNumber}</td>
-                                <td className="px-8 py-4">
+                                <td className="px-8 py-4.5 font-black text-indigo-300 text-xl">#{item.tokenNumber}</td>
+                                <td className="px-8 py-4.5">
                                   <div className="flex items-center gap-3">
-                                    <div className="w-8 h-8 rounded-xl bg-slate-800 text-slate-300 flex items-center justify-center font-bold text-xs uppercase">
+                                    <div className="w-9 h-9 rounded-xl bg-slate-800 text-slate-200 flex items-center justify-center font-bold text-sm uppercase">
                                       {item.user?.name ? item.user.name.slice(0,2) : 'WI'}
                                     </div>
                                     <div>
-                                      <p className="font-bold text-slate-200">{item.user?.name || 'Walk-in Patient'}</p>
-                                      <p className="text-slate-500 text-[10px] tracking-wide mt-0.5">{item.user?.email || 'Registered over counter'}</p>
+                                      <p className="font-bold text-slate-100 text-[15px]">{item.user?.name || 'Walk-in Patient'}</p>
+                                      <p className="text-slate-400 text-xs tracking-wide mt-0.5">{item.user?.email || 'Registered over counter'}</p>
                                     </div>
                                   </div>
                                 </td>
-                                <td className="px-8 py-4">
-                                  <p className="font-bold text-slate-300">Dr. {item.serviceName}</p>
-                                  <p className="text-slate-550 text-[10px] tracking-wide">Specialist</p>
+                                <td className="px-8 py-4.5">
+                                  <p className="font-bold text-slate-200 text-[15px]">
+                                    Dr. {isDoctor ? (user?.name || item.serviceName) : item.serviceName}
+                                  </p>
+                                  <p className="text-slate-400 text-xs tracking-wide">Specialist</p>
                                 </td>
-                                <td className="px-8 py-4">
-                                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                                <td className="px-8 py-4.5">
+                                  <span className={`inline-flex items-center px-3.5 py-1.5 rounded-full text-xs font-black uppercase tracking-wider ${
                                     item.status === 'completed' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 
                                     item.status === 'serving' ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 animate-pulse' :
                                     'bg-amber-500/10 text-amber-400 border border-amber-500/20'
@@ -835,12 +888,36 @@ const AdminDashboard = () => {
                                     {item.status}
                                   </span>
                                 </td>
-                                <td className="px-8 py-4">
-                                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                                <td className="px-8 py-4.5">
+                                  <span className={`inline-flex items-center px-3.5 py-1.5 rounded-full text-xs font-black uppercase tracking-wider ${
                                     item.priority === 'emergency' ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20 animate-pulse' : 'bg-slate-800 text-slate-400'
                                   }`}>
                                     {item.priority}
                                   </span>
+                                </td>
+                                <td className="px-8 py-4.5 text-center min-w-[170px]">
+                                  {item.status === 'serving' && (
+                                    <button
+                                      onClick={() => handleInlineComplete(item.tokenNumber, item.serviceName)}
+                                      className="w-24 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-sm font-bold transition shadow-md shadow-emerald-900/20"
+                                    >
+                                      Finish
+                                    </button>
+                                  )}
+                                  {item.status === 'waiting' && (
+                                    <button
+                                      onClick={() => handleInlineCall(item.serviceName)}
+                                      className="w-24 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-sm font-bold transition shadow-md shadow-indigo-900/20"
+                                    >
+                                      Call
+                                    </button>
+                                  )}
+                                  {item.status === 'completed' && (
+                                    <span className="text-emerald-400 text-sm font-bold">Done</span>
+                                  )}
+                                  {item.status === 'cancelled' && (
+                                    <span className="text-rose-400 text-sm font-bold">Cancelled</span>
+                                  )}
                                 </td>
                               </tr>
                             ));
@@ -914,7 +991,8 @@ const AdminDashboard = () => {
                   <select
                     value={serviceName}
                     onChange={(e) => setServiceName(e.target.value)}
-                    className="w-full px-5 py-4 bg-slate-950/60 border border-slate-800 focus:border-indigo-500 text-slate-200 rounded-2xl font-bold text-base focus:outline-none transition-all cursor-pointer"
+                    disabled={isDoctor}
+                    className="w-full px-5 py-4 bg-slate-950/60 border border-slate-800 focus:border-indigo-500 text-slate-200 rounded-2xl font-bold text-base focus:outline-none transition-all cursor-pointer disabled:opacity-75 disabled:cursor-not-allowed"
                   >
                     <option value="" className="bg-slate-900 text-slate-500">-- Choose Consultant Doctor --</option>
                     {doctors.map(doc => (
@@ -1020,6 +1098,12 @@ const AdminDashboard = () => {
                         <label className="block text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1.5">Contact Number</label>
                         <input type="text" required value={doctorForm.phone} onChange={e=>setDoctorForm({...doctorForm, phone:e.target.value})} className="w-full bg-slate-950/60 border border-slate-800 focus:border-indigo-500 px-4 py-3 rounded-xl text-sm font-semibold text-slate-200 focus:outline-none transition-all placeholder-slate-700" placeholder="e.g. 03001234567"/>
                       </div>
+                      {!doctorForm._id && (
+                        <div>
+                          <label className="block text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1.5">Login Password</label>
+                          <input type="password" required={!doctorForm._id} value={doctorForm.password || ''} onChange={e=>setDoctorForm({...doctorForm, password:e.target.value})} className="w-full bg-slate-950/60 border border-slate-800 focus:border-indigo-500 px-4 py-3 rounded-xl text-sm font-semibold text-slate-200 focus:outline-none transition-all placeholder-slate-700" placeholder="At least 6 characters"/>
+                        </div>
+                      )}
                       <div>
                         <label className="block text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1.5">Consultation Fee (Rs.)</label>
                         <input type="number" required value={doctorForm.consultationFee} onChange={e=>setDoctorForm({...doctorForm, consultationFee:e.target.value})} className="w-full bg-slate-950/60 border border-slate-800 focus:border-indigo-500 px-4 py-3 rounded-xl text-sm font-semibold text-slate-200 focus:outline-none transition-all"/>
@@ -1119,7 +1203,7 @@ const AdminDashboard = () => {
                     </div>
                     <div>
                       <label className="block text-[10px] font-black uppercase tracking-wider text-slate-400 mb-2">Select Attending Doctor</label>
-                      <select required value={reportForm.doctorId} onChange={(e) => setReportForm({...reportForm, doctorId: e.target.value})} className="w-full px-4 py-3 bg-slate-950/60 border border-slate-800 focus:border-indigo-500 text-slate-200 rounded-xl font-semibold text-sm focus:outline-none cursor-pointer">
+                      <select required value={reportForm.doctorId} onChange={(e) => setReportForm({...reportForm, doctorId: e.target.value})} disabled={isDoctor} className="w-full px-4 py-3 bg-slate-950/60 border border-slate-800 focus:border-indigo-500 text-slate-200 rounded-xl font-semibold text-sm focus:outline-none cursor-pointer disabled:opacity-75 disabled:cursor-not-allowed">
                         <option value="" className="bg-slate-900 text-slate-500">-- Choose Doctor --</option>
                         {doctors.map(d => (
                           <option key={d._id} value={d._id} className="bg-slate-900">Dr. {d.name}</option>

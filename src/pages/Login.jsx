@@ -23,7 +23,7 @@ const Login = () => {
     try {
       const res = await login(formData);
       loginUser(res.data.user, res.data.token);
-      if (res.data.user.role === 'admin') {
+      if (res.data.user.role === 'superadmin' || res.data.user.role === 'doctor') {
         navigate('/admin');
       } else {
         navigate('/dashboard');

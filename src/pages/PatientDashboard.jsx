@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import AppointmentReceipt from '../components/AppointmentReceipt';
 import LiveQueueCard from '../components/LiveQueueCard';
+import MedicalReportReceipt from '../components/MedicalReportReceipt';
 import { useAuth } from '../context/AuthContext';
 import socket from '../services/socket';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -12,7 +13,7 @@ import {
 } from 'lucide-react';
 import {
   getAllDoctors, joinQueue, getQueueStatus, cancelQueue, 
-  getQueueHistory, getMyReports, createPayment, getPaymentHistory
+  getQueueHistory, getMyReports, createPayment
 } from '../services/api';
 
 function localDateInputValue(d = new Date()) {
@@ -34,6 +35,8 @@ const PatientDashboard = () => {
   const [error, setError] = useState('');
   const [showReceipt, setShowReceipt] = useState(false);
   const [receiptData, setReceiptData] = useState(null);
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [selectedReport, setSelectedReport] = useState(null);
   
   const [joinForm, setJoinForm] = useState({
     serviceName: '', priority: 'normal', appointmentDate: '', 
@@ -51,8 +54,6 @@ const PatientDashboard = () => {
     gatewayTimersRef.current.forEach((id) => clearTimeout(id));
     gatewayTimersRef.current = [];
   };
-
-  const [payments, setPayments] = useState([]);
 
   useEffect(() => {
     fetchDoctors();
@@ -117,13 +118,6 @@ const PatientDashboard = () => {
     try {
       const res = await getQueueHistory();
       setHistory(res.data.history);
-    } catch (err) {}
-  };
-
-  const fetchPayments = async () => {
-    try {
-      const res = await getPaymentHistory();
-      setPayments(res.data.payments);
     } catch (err) {}
   };
 
@@ -299,7 +293,6 @@ const PatientDashboard = () => {
     setError('');
     if (tab === 'history') fetchHistory();
     if (tab === 'reports') fetchReports();
-    if (tab === 'payments') fetchPayments();
   };
 
   const tabs = [
@@ -1066,22 +1059,22 @@ const PatientDashboard = () => {
                         <FileText className="w-6 h-6" />
                       </div>
                       <div className="space-y-1">
-                        <h4 className="font-extrabold text-slate-800 dark:text-slate-100 text-base leading-tight group-hover:text-primary-500 transition-colors">{report.fileName || 'Diagnostic Report'}</h4>
-                        <span className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest block">Doctor: Dr. {report.doctorId?.name || 'Specialist'}</span>
+                        <h4 className="font-extrabold text-slate-800 dark:text-slate-100 text-base leading-tight group-hover:text-primary-500 transition-colors">{report.diagnosis || 'Diagnostic Report'}</h4>
+                        <span className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest block">Doctor: Dr. {report.doctor?.name || 'Specialist'}</span>
                         <span className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest block">Date: {new Date(report.createdAt).toLocaleDateString('en-US', { dateStyle: 'medium' })}</span>
                       </div>
                     </div>
 
                     <div className="mt-6 pt-4 border-t border-slate-200/50 dark:border-slate-800 flex justify-end">
-                      <a 
-                        href={`http://localhost:5000${report.filePath}`}
-                        download
-                        target="_blank"
-                        rel="noreferrer"
-                        className="bg-slate-50 dark:bg-slate-800 hover:bg-primary-500 dark:hover:bg-primary-500 text-slate-600 dark:text-slate-400 hover:text-white dark:hover:text-white px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center gap-2 border border-slate-200/60 dark:border-slate-800 transition duration-300 shadow-xs"
+                      <button 
+                        onClick={() => {
+                          setSelectedReport(report);
+                          setShowReportModal(true);
+                        }}
+                        className="bg-slate-50 dark:bg-slate-800 hover:bg-primary-500 dark:hover:bg-primary-500 text-slate-600 dark:text-slate-400 hover:text-white dark:hover:text-white px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center gap-2 border border-slate-200/60 dark:border-slate-800 transition duration-300 shadow-xs cursor-pointer"
                       >
-                        <FileDown className="w-4 h-4" /> Download PDF
-                      </a>
+                        <FileText className="w-4 h-4" /> View & Print Report
+                      </button>
                     </div>
                   </motion.div>
                 ))}
@@ -1123,6 +1116,20 @@ const PatientDashboard = () => {
               />
             </motion.div>
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Medical Report Receipt Modal */}
+      <AnimatePresence>
+        {showReportModal && selectedReport && (
+          <MedicalReportReceipt 
+            report={selectedReport} 
+            patientName={user?.name}
+            onClose={() => {
+              setShowReportModal(false);
+              setSelectedReport(null);
+            }} 
+          />
         )}
       </AnimatePresence>
 
