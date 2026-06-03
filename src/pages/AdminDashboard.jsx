@@ -3,7 +3,7 @@ import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  callNextPatient, completeQueue, getAnalyticsOverall, 
+  callNextPatient, callPatientByToken, completeQueue, getAnalyticsOverall, 
   getAllPayments, createMedicalReport, getAllUsers, getAllDoctors,
   getPatientQueue, completeFinalPayment, addDoctor,
   updateDoctor, deleteDoctor, clearOldData, getPatientClinicHistory
@@ -117,7 +117,9 @@ const AdminDashboard = () => {
 
   const fetchTodayStats = async () => {
     try {
-      const res = await api.get('/analytics/today');
+      const d = new Date();
+      const localDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      const res = await api.get(`/analytics/today?date=${localDate}`);
       setTodayStats(res.data);
     } catch (error) {
       console.error("Error fetching today stats:", error);
@@ -143,8 +145,14 @@ const AdminDashboard = () => {
   const fetchUsers = async () => {
     try {
       const res = await getAllUsers();
-      setUsers(res.data);
-    } catch (err) {}
+      setUsers(res.data || []);
+      if (!res.data?.length && user?.role === 'doctor') {
+        setError('No patients found for your queue yet. Patients must book an appointment with your name first.');
+      }
+    } catch (err) {
+      setUsers([]);
+      setError(err.response?.data?.message || 'Failed to load patient list');
+    }
   };
 
   const fetchDoctors = useCallback(async () => {
@@ -198,12 +206,16 @@ const AdminDashboard = () => {
     }
   }, [user, isDoctor]);
 
-  const handleInlineCall = async (docName) => {
+  const handleInlineCall = async (docName, tokenNum, queueId) => {
     setLoading(true);
     setError('');
     setMessage('');
     try {
-      const res = await callNextPatient({ serviceName: docName });
+      const res = await callPatientByToken({
+        serviceName: docName,
+        tokenNumber: tokenNum,
+        queueId: queueId || undefined
+      });
       setMessage(`✅ Token ${res.data.tokenNumber} called! Priority: ${res.data.priority}`);
       fetchTodayStats();
     } catch (err) {
@@ -212,12 +224,16 @@ const AdminDashboard = () => {
     setLoading(false);
   };
 
-  const handleInlineComplete = async (tNum, docName) => {
+  const handleInlineComplete = async (tNum, docName, queueId) => {
     setLoading(true);
     setError('');
     setMessage('');
     try {
-      const res = await completeQueue({ tokenNumber: tNum, serviceName: docName });
+      const res = await completeQueue({
+        tokenNumber: tNum,
+        serviceName: docName,
+        queueId: queueId || undefined
+      });
       setMessage(`✅ Token ${res.data.tokenNumber} completed!`);
       fetchTodayStats();
     } catch (err) {
@@ -500,9 +516,9 @@ const AdminDashboard = () => {
     { id: 'dashboard', label: 'Overview', icon: LayoutDashboard },
     { id: 'queue', label: 'Queue Manager', icon: Users },
     ...(!isDoctor ? [{ id: 'doctors', label: 'Manage Doctors', icon: Stethoscope }] : []),
-    ...(isDoctor ? [{ id: 'reports', label: 'Medical Reports', icon: FileText }] : []),
+    ...(isDoctor ? [{ id: 'reports', label: 'Create Report', icon: FileText }] : []),
     ...(!isDoctor ? [{ id: 'payments', label: 'Financial Records', icon: CreditCard }] : []),
-    { id: 'patientHistory', label: 'Patient Lookup', icon: History },
+    { id: 'patientHistory', label: isDoctor ? 'Patient Lookup' : 'Reports & History', icon: History },
   ];
 
   return (
@@ -898,7 +914,7 @@ const AdminDashboard = () => {
                                 <td className="px-8 py-4.5 text-center min-w-[170px]">
                                   {item.status === 'serving' && (
                                     <button
-                                      onClick={() => handleInlineComplete(item.tokenNumber, item.serviceName)}
+                                      onClick={() => handleInlineComplete(item.tokenNumber, item.serviceName, item._id)}
                                       className="w-24 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-sm font-bold transition shadow-md shadow-emerald-900/20"
                                     >
                                       Finish
@@ -906,7 +922,7 @@ const AdminDashboard = () => {
                                   )}
                                   {item.status === 'waiting' && (
                                     <button
-                                      onClick={() => handleInlineCall(item.serviceName)}
+                                      onClick={() => handleInlineCall(item.serviceName, item.tokenNumber, item._id)}
                                       className="w-24 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-sm font-bold transition shadow-md shadow-indigo-900/20"
                                     >
                                       Call
@@ -1182,11 +1198,11 @@ const AdminDashboard = () => {
           )}
 
           {/* ==================== MEDICAL REPORTS TAB ==================== */}
-          {activeTab === 'reports' && (
+          {activeTab === 'reports' && isDoctor && (
             <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} className="max-w-3xl mx-auto space-y-8">
               <div>
                 <h2 className="text-3xl font-black text-slate-100 tracking-tight">Create Medical Report</h2>
-                <p className="text-slate-400 text-sm mt-1">Generate complete diagnosis reports, vitals mapping, and prescriptions.</p>
+                <p className="text-slate-400 text-sm mt-1">Only doctors can generate reports. Select a patient who booked with you.</p>
               </div>
 
               <div className="bg-slate-900 border border-slate-800 rounded-[2.5rem] p-8 shadow-2xl relative">
@@ -1196,7 +1212,7 @@ const AdminDashboard = () => {
                       <label className="block text-[10px] font-black uppercase tracking-wider text-slate-400 mb-2">Select Patient Profile</label>
                       <select required value={reportForm.patientId} onChange={(e) => handlePatientChange(e.target.value)} className="w-full px-4 py-3 bg-slate-950/60 border border-slate-800 focus:border-indigo-500 text-slate-200 rounded-xl font-semibold text-sm focus:outline-none cursor-pointer">
                         <option value="" className="bg-slate-900 text-slate-500">-- Choose Patient --</option>
-                        {users.filter(u => u.role !== 'admin').map(u => (
+                        {users.filter(u => u.role === 'user').map(u => (
                           <option key={u._id} value={u._id} className="bg-slate-900">{u.name} ({u.email})</option>
                         ))}
                       </select>
@@ -1356,7 +1372,11 @@ const AdminDashboard = () => {
             <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} className="max-w-4xl mx-auto space-y-6">
               <div>
                 <h2 className="text-3xl font-black text-slate-100 tracking-tight">Patient Search Lookup</h2>
-                <p className="text-slate-400 text-sm mt-1">Instantly fetch deep clinical timelines, past diagnostics reports, and cash collection flows.</p>
+                <p className="text-slate-400 text-sm mt-1">
+                  {isDoctor
+                    ? 'Search your patients, view visit history and past reports.'
+                    : 'Superadmin view only: search patients and read medical reports (doctors create reports).'}
+                </p>
               </div>
 
               <div className="bg-slate-900 border border-slate-800 rounded-[2.5rem] p-8 shadow-2xl">

@@ -79,6 +79,7 @@ export const getMyReports = () => API.get('/medical-reports/my-reports');
 
 // ADMIN
 export const callNextPatient = (data) => API.post('/queue/call-next', data);
+export const callPatientByToken = (data) => API.post('/queue/call-token', data);
 export const completeQueue = (data) => API.post('/queue/complete', data);
 export const getAnalyticsToday = () => API.get('/analytics/today');
 export const getAnalyticsOverall = () => API.get('/analytics/overall');
