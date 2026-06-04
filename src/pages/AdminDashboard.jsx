@@ -117,9 +117,7 @@ const AdminDashboard = () => {
 
   const fetchTodayStats = async () => {
     try {
-      const d = new Date();
-      const localDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-      const res = await api.get(`/analytics/today?date=${localDate}`);
+      const res = await api.get('/analytics/today');
       setTodayStats(res.data);
     } catch (error) {
       console.error("Error fetching today stats:", error);
