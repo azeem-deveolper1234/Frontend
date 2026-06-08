@@ -37,10 +37,12 @@ const PatientDashboard = () => {
   const [receiptData, setReceiptData] = useState(null);
   const [showReportModal, setShowReportModal] = useState(false);
   const [selectedReport, setSelectedReport] = useState(null);
+  const [showDoctorModal, setShowDoctorModal] = useState(false);
+  const [selectedDoctor, setSelectedDoctor] = useState(null);
   
   const [joinForm, setJoinForm] = useState({
     serviceName: '', priority: 'normal', appointmentDate: '', 
-    notes: '', totalAmount: '', paymentMethod: 'cash'
+    notes: '', totalAmount: '', paymentMethod: 'card'
   });
 
   const [showGateway, setShowGateway] = useState(false);
@@ -58,6 +60,8 @@ const PatientDashboard = () => {
   useEffect(() => {
     fetchDoctors();
     fetchQueueStatus();
+    fetchHistory();
+    fetchReports();
 
     const interval = setInterval(() => {
       fetchQueueStatus();
@@ -139,7 +143,8 @@ const PatientDashboard = () => {
         serviceName: form.serviceName,
         priority: form.priority,
         appointmentDate: form.appointmentDate,
-        notes: form.notes
+        notes: form.notes,
+        paymentMethod: form.paymentMethod
       });
 
       const newQueueId = queueRes.data._id;
@@ -192,7 +197,7 @@ const PatientDashboard = () => {
       setActiveTab('home');
       setJoinForm({
         serviceName: '', priority: 'normal', appointmentDate: '',
-        notes: '', totalAmount: '', paymentMethod: 'cash'
+        notes: '', totalAmount: '', paymentMethod: 'card'
       });
     } catch (err) {
       const apiMsg = err.response?.data?.message;
@@ -342,7 +347,10 @@ const PatientDashboard = () => {
   const ticketStyle = getProximityTicketStyle();
 
   return (
-    <div className="min-h-screen bg-slate-50/50 dark:bg-slate-950 flex flex-col font-sans">
+    <div className="min-h-screen bg-slate-50/50 dark:bg-slate-950 flex flex-col font-sans relative overflow-hidden">
+      {/* Background ambient glowing shapes */}
+      <div className="absolute top-[-10%] left-[-15%] w-[45rem] h-[45rem] rounded-full bg-primary-500/5 dark:bg-primary-500/[0.03] blur-3xl pointer-events-none z-0"></div>
+      <div className="absolute bottom-[-10%] right-[-15%] w-[50rem] h-[50rem] rounded-full bg-indigo-500/5 dark:bg-indigo-500/[0.02] blur-3xl pointer-events-none z-0"></div>
       
       {/* Dynamic Messages Overlay banner */}
       <AnimatePresence>
@@ -509,7 +517,7 @@ const PatientDashboard = () => {
       </AnimatePresence>
 
       {/* Modern Global Layout with Top Nav & Tabs Bar */}
-      <nav className="bg-white dark:bg-slate-900 border-b border-slate-200/60 dark:border-slate-800/80 z-30 relative shadow-sm">
+      <nav className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200/60 dark:border-slate-800/80 z-30 sticky top-0 shadow-sm transition-colors duration-300">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-20">
             <div className="flex items-center gap-3">
@@ -526,8 +534,8 @@ const PatientDashboard = () => {
             </div>
             
             <div className="flex items-center gap-4">
-              <div className="flex items-center gap-3 bg-slate-50 dark:bg-slate-800/40 py-1.5 pl-3.5 pr-1.5 rounded-2xl border border-slate-100 dark:border-slate-800/40">
-                <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Aslam</span>
+              <div className="flex items-center gap-3 bg-slate-50/80 dark:bg-slate-800/50 py-1.5 pl-3.5 pr-1.5 rounded-2xl border border-slate-100 dark:border-slate-800/40">
+                <span className="text-xs font-bold text-slate-700 dark:text-slate-300">{user?.name || 'Patient'}</span>
                 <div className="w-7 h-7 rounded-xl bg-primary-500 text-white flex items-center justify-center font-bold text-xs uppercase shadow-sm">
                   {user?.name ? user.name.slice(0,2) : 'PT'}
                 </div>
@@ -547,7 +555,7 @@ const PatientDashboard = () => {
       </nav>
 
       {/* Tabs Menu Section */}
-      <div className="bg-white dark:bg-slate-900 border-b border-slate-200/50 dark:border-slate-800/60 shadow-xs z-20">
+      <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-xs border-b border-slate-200/50 dark:border-slate-800/60 shadow-xs z-20 sticky top-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex space-x-6 overflow-x-auto hide-scrollbar">
             {tabs.map(tab => {
@@ -584,9 +592,56 @@ const PatientDashboard = () => {
           <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
               <div>
-                <h2 className="text-3xl font-black text-slate-800 dark:text-slate-100 tracking-tight">Assalam-o-Alaikum, {user?.name.split(' ')[0]}!</h2>
+                <h2 className="text-3xl font-black text-slate-800 dark:text-slate-100 tracking-tight">Assalam-o-Alaikum, {user?.name ? user.name.split(' ')[0] : 'Patient'}!</h2>
                 <p className="text-slate-400 dark:text-slate-500 font-semibold text-sm mt-1">Real-time status check karein aur specialized care paayein.</p>
               </div>
+            </div>
+
+            {/* Quick Stats Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+              <motion.div 
+                whileHover={{ y: -3 }}
+                onClick={() => handleTabChange('history')}
+                className="bg-white dark:bg-slate-900 border border-slate-200/50 dark:border-slate-800 rounded-[2rem] p-6 flex items-center gap-4 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-850/50 transition duration-300"
+              >
+                <div className="w-12 h-12 bg-indigo-500/10 text-indigo-500 dark:text-indigo-400 rounded-2xl flex items-center justify-center shrink-0">
+                  <History className="w-6 h-6" />
+                </div>
+                <div>
+                  <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest block">Total Consultations</span>
+                  <span className="text-xl font-black text-slate-800 dark:text-slate-100">{history.length} Visits</span>
+                </div>
+              </motion.div>
+
+              <motion.div 
+                whileHover={{ y: -3 }}
+                onClick={() => handleTabChange('reports')}
+                className="bg-white dark:bg-slate-900 border border-slate-200/50 dark:border-slate-800 rounded-[2rem] p-6 flex items-center gap-4 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-850/50 transition duration-300"
+              >
+                <div className="w-12 h-12 bg-emerald-500/10 text-emerald-500 dark:text-emerald-400 rounded-2xl flex items-center justify-center shrink-0">
+                  <FileText className="w-6 h-6" />
+                </div>
+                <div>
+                  <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest block">Clinical Reports</span>
+                  <span className="text-xl font-black text-slate-800 dark:text-slate-100">{reports.length} Available</span>
+                </div>
+              </motion.div>
+
+              <motion.div 
+                whileHover={{ y: -3 }}
+                onClick={() => handleTabChange('history')}
+                className="bg-white dark:bg-slate-900 border border-slate-200/50 dark:border-slate-800 rounded-[2rem] p-6 flex items-center gap-4 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-850/50 transition duration-300"
+              >
+                <div className="w-12 h-12 bg-amber-500/10 text-amber-500 dark:text-amber-405 rounded-2xl flex items-center justify-center shrink-0">
+                  <User className="w-6 h-6" />
+                </div>
+                <div>
+                  <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest block">Last Specialist</span>
+                  <span className="text-sm font-black text-slate-800 dark:text-slate-100 truncate block max-w-[150px]" title={history[0]?.serviceName ? `Dr. ${history[0].serviceName}` : 'No past visits'}>
+                    {history[0]?.serviceName ? `Dr. ${history[0].serviceName}` : 'None'}
+                  </span>
+                </div>
+              </motion.div>
             </div>
 
             {/* Premium Boarding Pass Active Queue Ticket */}
@@ -607,31 +662,63 @@ const PatientDashboard = () => {
                       {ticketStyle.statusLabel}
                     </span>
                     <div>
-                      <h3 className="text-5xl font-black tracking-tighter">Token #{queueStatus.yourToken}</h3>
-                      <p className="text-white/80 font-bold mt-2 flex items-center gap-2 text-sm">
-                        <User className="w-4 h-4 text-teal-300" /> Dr. {queueStatus.serviceName} (Specialist Consultation)
+                      <span className="text-[10px] font-black uppercase tracking-widest text-teal-300 block mb-1">Clinic Pass Ticket</span>
+                      <h3 className="text-6xl font-black tracking-tighter">Token #{queueStatus.yourToken}</h3>
+                      <p className="text-white/95 font-bold mt-3.5 flex items-center gap-2 text-sm bg-white/10 backdrop-blur-xs py-2 px-4 rounded-xl border border-white/10 w-fit">
+                        <User className="w-4 h-4 text-teal-300 animate-pulse" /> Attending: Dr. {queueStatus.serviceName}
                       </p>
                     </div>
                   </div>
 
-                  <div className="flex gap-4 w-full lg:w-auto">
-                    <div className="bg-white/10 backdrop-blur-md rounded-3xl p-5 flex-1 lg:w-36 border border-white/15 text-center shadow-xs">
-                      <p className="text-4xl font-black tracking-tight">{queueStatus.peopleAhead}</p>
-                      <p className="text-[10px] text-white/70 font-black uppercase tracking-widest mt-1.5">Patients Ahead</p>
+                  <div className="flex flex-col sm:flex-row items-center gap-6 w-full lg:w-auto">
+                    <div className="flex gap-4 w-full sm:w-auto">
+                      <div className="bg-white/10 backdrop-blur-md rounded-3xl p-5 flex-1 sm:w-36 border border-white/15 text-center shadow-xs">
+                        <p className="text-4xl font-black tracking-tight">{queueStatus.peopleAhead}</p>
+                        <p className="text-[10px] text-white/70 font-black uppercase tracking-widest mt-1.5">Patients Ahead</p>
+                      </div>
+                      <div className="bg-white/10 backdrop-blur-md rounded-3xl p-5 flex-1 sm:w-36 border border-white/15 text-center shadow-xs">
+                        <p className="text-4xl font-black tracking-tight">{queueStatus.estimatedTime}m</p>
+                        <p className="text-[10px] text-white/70 font-black uppercase tracking-widest mt-1.5">Est. Wait Time</p>
+                      </div>
                     </div>
-                    <div className="bg-white/10 backdrop-blur-md rounded-3xl p-5 flex-1 lg:w-36 border border-white/15 text-center shadow-xs">
-                      <p className="text-4xl font-black tracking-tight">{queueStatus.estimatedTime}m</p>
-                      <p className="text-[10px] text-white/70 font-black uppercase tracking-widest mt-1.5">Est. Wait Time</p>
+                    
+                    {/* Barcode Mockup decoration on larger screen sizes */}
+                    <div className="hidden xl:flex flex-col items-center bg-white/95 p-3 rounded-2xl gap-1 border border-white/20 select-none shadow-sm">
+                      <div className="flex gap-0.5 h-12 w-28 items-center bg-white justify-center">
+                        <div className="w-1.5 h-full bg-slate-950"></div>
+                        <div className="w-0.5 h-full bg-slate-950"></div>
+                        <div className="w-1 h-full bg-slate-950"></div>
+                        <div className="w-0.5 h-full bg-slate-950"></div>
+                        <div className="w-2 h-full bg-slate-950"></div>
+                        <div className="w-0.5 h-full bg-slate-950"></div>
+                        <div className="w-1.5 h-full bg-slate-950"></div>
+                        <div className="w-1 h-full bg-slate-950"></div>
+                        <div className="w-0.5 h-full bg-slate-950"></div>
+                        <div className="w-2 h-full bg-slate-950"></div>
+                        <div className="w-0.5 h-full bg-slate-950"></div>
+                      </div>
+                      <span className="text-[8px] font-black tracking-wider text-slate-800 uppercase font-mono">TKN-{queueStatus.yourToken}-{queueStatus.serviceName?.slice(0,3).toUpperCase()}</span>
                     </div>
                   </div>
                 </div>
                 
-                <div className="mt-8 pt-6 border-t border-white/15 flex justify-end relative z-10">
+                {/* Punch card dashed separator line */}
+                <div className="relative flex items-center justify-between my-6 pointer-events-none">
+                  <div className="w-6 h-6 rounded-full bg-slate-50 dark:bg-slate-950 -ml-11"></div>
+                  <div className="border-t-2 border-dashed border-white/20 flex-1 mx-2"></div>
+                  <div className="w-6 h-6 rounded-full bg-slate-50 dark:bg-slate-950 -mr-11"></div>
+                </div>
+                
+                <div className="flex justify-between items-center relative z-10">
+                  <div className="flex items-center gap-2 text-xs font-semibold text-white/80">
+                    <Clock className="w-4 h-4 text-teal-300" />
+                    <span>Est. Appointment: <strong className="text-white font-black">{new Date(Date.now() + queueStatus.estimatedTime * 60000).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</strong></span>
+                  </div>
                   <motion.button
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
                     onClick={handleCancelQueue}
-                    className="bg-white/10 hover:bg-rose-500/90 text-white font-extrabold text-xs px-6 py-3 rounded-2xl transition duration-300 border border-white/10"
+                    className="bg-white/10 hover:bg-rose-500/90 text-white font-extrabold text-xs px-6 py-3 rounded-2xl transition duration-300 border border-white/10 hover:border-transparent"
                   >
                     Cancel Appointment
                   </motion.button>
@@ -672,29 +759,55 @@ const PatientDashboard = () => {
                 {doctors.map(doc => (
                   <motion.div 
                     key={doc._id} 
-                    whileHover={{ y: -4 }}
-                    className="bg-white dark:bg-slate-900 rounded-[2rem] shadow-xs hover:shadow-lg border border-slate-200/50 dark:border-slate-800 p-6 flex flex-col justify-between transition-all duration-300 relative overflow-hidden group"
+                    whileHover={{ y: -6, scale: 1.02 }}
+                    onClick={() => { setSelectedDoctor(doc); setShowDoctorModal(true); }}
+                    className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-xs hover:shadow-xl border border-slate-200/50 dark:border-slate-800 p-6 flex flex-col justify-between transition-all duration-300 relative overflow-hidden group cursor-pointer"
                   >
-                    <div className="absolute inset-0 bg-gradient-to-br from-primary-500/5 to-indigo-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
+                    <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/5 to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
                     <div className="flex items-start gap-4">
-                      <div className="w-14 h-14 bg-indigo-50/80 dark:bg-indigo-950/20 text-indigo-600 dark:text-indigo-400 rounded-2xl flex items-center justify-center shrink-0 shadow-xs border border-indigo-100/30 dark:border-indigo-500/10">
+                      <div className="w-14 h-14 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 rounded-2xl flex items-center justify-center shrink-0 shadow-xs border border-indigo-100/30 dark:border-indigo-500/10">
                         <User className="w-7 h-7" />
                       </div>
-                      <div>
-                        <h4 className="font-extrabold text-slate-800 dark:text-slate-100 text-lg group-hover:text-primary-500 transition-colors">Dr. {doc.name}</h4>
-                        <p className="text-primary-600 dark:text-primary-400 font-bold text-xs uppercase tracking-wider mt-0.5">{doc.specialization}</p>
+                      <div className="flex-1 min-w-0">
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-indigo-100/60 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 mb-2">
+                          {doc.degree || 'M.B.B.S.'}
+                        </span>
+                        <h4 className="font-black text-slate-800 dark:text-slate-100 text-lg group-hover:text-primary-500 transition-colors truncate">
+                          Dr. {doc.name}
+                        </h4>
+                        <p className="text-primary-600 dark:text-primary-400 font-extrabold text-xs uppercase tracking-widest mt-0.5">
+                          {doc.specialization}
+                        </p>
                         
                         <div className="space-y-2 mt-4">
-                          <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 font-semibold">
+                          <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 font-bold">
                             <Clock className="w-4 h-4 text-slate-400 dark:text-slate-600" />
                             {doc.slotDuration} min consultations
                           </div>
-                          <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 font-semibold">
+                          {doc.experience && (
+                            <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 font-bold">
+                              <Sparkles className="w-4 h-4 text-slate-400 dark:text-slate-600" />
+                              {doc.experience} Years Experience
+                            </div>
+                          )}
+                          <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 font-bold">
                             <Banknote className="w-4 h-4 text-slate-400 dark:text-slate-600" />
-                            Consultation fee: <span className="font-black text-slate-800 dark:text-slate-200 ml-1">Rs. {doc.consultationFee}</span>
+                            Fee: <span className="font-black text-indigo-600 dark:text-indigo-400 ml-1">Rs. {doc.consultationFee}</span>
                           </div>
                         </div>
                       </div>
+                    </div>
+
+                    <div className="mt-5 pt-4 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between">
+                      <span className="text-xs text-slate-400 dark:text-slate-500 font-bold group-hover:text-slate-600 dark:group-hover:text-slate-350 transition-colors">
+                        View Schedule & Profile
+                      </span>
+                      <motion.div
+                        whileHover={{ x: 3 }}
+                        className="w-8 h-8 rounded-xl bg-slate-50 dark:bg-slate-950 flex items-center justify-center text-slate-400 group-hover:bg-primary-500 group-hover:text-white transition-colors"
+                      >
+                        <ChevronRight className="w-4.5 h-4.5" />
+                      </motion.div>
                     </div>
                   </motion.div>
                 ))}
@@ -1130,6 +1243,140 @@ const PatientDashboard = () => {
               setSelectedReport(null);
             }} 
           />
+        )}
+      </AnimatePresence>
+
+      {/* Doctor Profile Modal */}
+      <AnimatePresence>
+        {showDoctorModal && selectedDoctor && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 backdrop-blur-md p-4 overflow-y-auto"
+          >
+            <motion.div 
+              initial={{ scale: 0.92, y: 30 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.92, y: 30 }}
+              className="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-[2.5rem] shadow-2xl relative border border-slate-100 dark:border-slate-800/80 overflow-hidden text-slate-800 dark:text-slate-100"
+            >
+              {/* Top Banner Accent */}
+              <div className="h-32 bg-gradient-to-r from-primary-600 to-indigo-600 relative">
+                <button 
+                  onClick={() => { setShowDoctorModal(false); setSelectedDoctor(null); }} 
+                  className="absolute top-6 right-6 w-9 h-9 rounded-full bg-black/20 hover:bg-black/40 text-white flex items-center justify-center backdrop-blur-xs transition cursor-pointer font-bold"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Doctor Details Header */}
+              <div className="px-8 sm:px-10 pb-8 relative">
+                {/* Avatar positioning */}
+                <div className="-mt-16 mb-4 flex items-end gap-5">
+                  <div className="w-28 h-28 bg-slate-100 dark:bg-slate-950 border-4 border-white dark:border-slate-900 rounded-[2rem] shadow-md flex items-center justify-center text-primary-600 dark:text-primary-400 font-black text-3xl uppercase">
+                    {selectedDoctor.name ? selectedDoctor.name.slice(0, 2) : 'DR'}
+                  </div>
+                  <div className="pb-2">
+                    <h3 className="text-2xl font-black text-slate-800 dark:text-slate-100 leading-none">
+                      Dr. {selectedDoctor.name}
+                    </h3>
+                    <p className="text-primary-600 dark:text-primary-400 font-extrabold text-sm uppercase tracking-wider mt-1.5">
+                      {selectedDoctor.specialization}
+                    </p>
+                  </div>
+                </div>
+
+                {/* About Profile Info */}
+                <div className="space-y-6 mt-6">
+                  <div className="space-y-2">
+                    <h4 className="text-xs font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">
+                      About Consultant
+                    </h4>
+                    <p className="text-sm text-slate-600 dark:text-slate-350 leading-relaxed font-medium">
+                      {selectedDoctor.about || `Dr. ${selectedDoctor.name} is a highly accomplished specialist offering premium clinical consultations.`}
+                    </p>
+                  </div>
+
+                  {/* Highlights Grid */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 p-5 bg-slate-50 dark:bg-slate-950 rounded-3xl border border-slate-200/50 dark:border-slate-800/80">
+                    <div className="space-y-1">
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Qualifications</span>
+                      <span className="text-xs font-black text-slate-850 dark:text-slate-200">{selectedDoctor.degree || 'M.B.B.S.'}</span>
+                    </div>
+                    <div className="space-y-1">
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Specialized From</span>
+                      <span className="text-xs font-black text-slate-850 dark:text-slate-200 truncate block max-w-full" title={selectedDoctor.specializedFrom || 'City Medical University'}>
+                        {selectedDoctor.specializedFrom || 'City Medical University'}
+                      </span>
+                    </div>
+                    <div className="space-y-1">
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Experience</span>
+                      <span className="text-xs font-black text-slate-850 dark:text-slate-200">{selectedDoctor.experience || 5} Years</span>
+                    </div>
+                    <div className="space-y-1">
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Fee</span>
+                      <span className="text-xs font-black text-indigo-600 dark:text-indigo-400">Rs. {selectedDoctor.consultationFee}</span>
+                    </div>
+                  </div>
+
+                  {/* Consulting Schedule */}
+                  <div className="space-y-2.5">
+                    <h4 className="text-xs font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">
+                      Weekly Schedule Timings
+                    </h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                      {selectedDoctor.schedule && selectedDoctor.schedule.length > 0 ? (
+                        selectedDoctor.schedule.map((item, idx) => (
+                          <div 
+                            key={idx} 
+                            className="flex items-center justify-between p-3.5 rounded-2xl bg-slate-50/50 dark:bg-slate-900/50 border border-slate-200/40 dark:border-slate-800/60"
+                          >
+                            <span className="text-xs font-extrabold text-slate-700 dark:text-slate-300">{item.day}</span>
+                            <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md ${
+                              item.isAvailable 
+                                ? 'bg-emerald-500/10 text-emerald-500' 
+                                : 'bg-slate-200 dark:bg-slate-800 text-slate-500'
+                            }`}>
+                              {item.isAvailable ? `${item.startTime} - ${item.endTime}` : 'Off Day'}
+                            </span>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-xs italic text-slate-400">Schedule not declared. Appointments can be requested.</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Footer Buttons */}
+                <div className="mt-8 pt-6 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-end gap-3.5">
+                  <button 
+                    onClick={() => { setShowDoctorModal(false); setSelectedDoctor(null); }} 
+                    className="px-6 py-3.5 rounded-2xl text-xs font-extrabold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 transition"
+                  >
+                    Close Profile
+                  </button>
+                  <button 
+                    onClick={() => {
+                      setJoinForm({
+                        ...joinForm,
+                        serviceName: selectedDoctor.name,
+                        totalAmount: selectedDoctor.consultationFee
+                      });
+                      setShowDoctorModal(false);
+                      setSelectedDoctor(null);
+                      setActiveTab('book');
+                    }}
+                    className="px-7 py-3.5 rounded-2xl text-xs font-black uppercase tracking-wider bg-primary-500 hover:bg-primary-600 text-white transition flex items-center gap-2 shadow-lg shadow-primary-500/10 cursor-pointer"
+                  >
+                    <CalendarPlus className="w-4 h-4" /> Book Appointment Now
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
         )}
       </AnimatePresence>
 

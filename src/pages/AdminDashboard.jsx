@@ -74,6 +74,7 @@ const AdminDashboard = () => {
   const [doctorForm, setDoctorForm] = useState({
     name: '', specialization: '', email: '', phone: '',
     slotDuration: 15, maxPatientsPerDay: 20, consultationFee: 1000,
+    degree: '', experience: '', specializedFrom: '', about: '',
     schedule: [
       { day: 'Monday', startTime: '09:00', endTime: '17:00', isAvailable: true },
       { day: 'Tuesday', startTime: '09:00', endTime: '17:00', isAvailable: true },
@@ -478,6 +479,7 @@ const AdminDashboard = () => {
       setDoctorForm({
         name: '', specialization: '', email: '', phone: '',
         slotDuration: 15, maxPatientsPerDay: 20, consultationFee: 1000,
+        degree: '', experience: '', specializedFrom: '', about: '',
         schedule: [
           { day: 'Monday', startTime: '09:00', endTime: '17:00', isAvailable: true },
           { day: 'Tuesday', startTime: '09:00', endTime: '17:00', isAvailable: true },
@@ -493,7 +495,13 @@ const AdminDashboard = () => {
   };
 
   const handleEditDoctor = (doc) => {
-    setDoctorForm(doc);
+    setDoctorForm({
+      ...doc,
+      degree: doc.degree || '',
+      experience: doc.experience || '',
+      specializedFrom: doc.specializedFrom || '',
+      about: doc.about || '',
+    });
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -1121,6 +1129,24 @@ const AdminDashboard = () => {
                       <div>
                         <label className="block text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1.5">Consultation Fee (Rs.)</label>
                         <input type="number" required value={doctorForm.consultationFee} onChange={e=>setDoctorForm({...doctorForm, consultationFee:e.target.value})} className="w-full bg-slate-950/60 border border-slate-800 focus:border-indigo-500 px-4 py-3 rounded-xl text-sm font-semibold text-slate-200 focus:outline-none transition-all"/>
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1.5">Doctor Degree / Education</label>
+                        <input type="text" value={doctorForm.degree} onChange={e=>setDoctorForm({...doctorForm, degree:e.target.value})} className="w-full bg-slate-950/60 border border-slate-800 focus:border-indigo-500 px-4 py-3 rounded-xl text-sm font-semibold text-slate-200 focus:outline-none transition-all placeholder-slate-700" placeholder="e.g. M.B.B.S, F.C.P.S (Cardiology)"/>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1.5">Specialized From (Institute)</label>
+                          <input type="text" value={doctorForm.specializedFrom} onChange={e=>setDoctorForm({...doctorForm, specializedFrom:e.target.value})} className="w-full bg-slate-950/60 border border-slate-800 focus:border-indigo-500 px-4 py-3 rounded-xl text-sm font-semibold text-slate-200 focus:outline-none transition-all placeholder-slate-700" placeholder="e.g. King Edward Medical University"/>
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1.5">Experience (Years)</label>
+                          <input type="number" value={doctorForm.experience} onChange={e=>setDoctorForm({...doctorForm, experience:e.target.value})} className="w-full bg-slate-950/60 border border-slate-800 focus:border-indigo-500 px-4 py-3 rounded-xl text-sm font-semibold text-slate-200 focus:outline-none transition-all"/>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1.5">About / Biography</label>
+                        <textarea rows="3" value={doctorForm.about} onChange={e=>setDoctorForm({...doctorForm, about:e.target.value})} className="w-full bg-slate-950/60 border border-slate-800 focus:border-indigo-500 px-4 py-3 rounded-xl text-sm font-semibold text-slate-200 focus:outline-none transition-all placeholder-slate-700" placeholder="Describe the doctor's professional background..."></textarea>
                       </div>
                       <div className="grid grid-cols-2 gap-4">
                         <div>

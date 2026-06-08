@@ -30,7 +30,7 @@ const API = axios.create({
 
 // Har request mein token automatically add ho
 API.interceptors.request.use((req) => {
-  const token = localStorage.getItem('token');
+  const token = sessionStorage.getItem('token');
   if (token) {
     req.headers.Authorization = `Bearer ${token}`;
   }
@@ -45,9 +45,9 @@ API.interceptors.response.use(
     const reqUrl = String(err.config?.url || '');
     const isAuthAttempt =
       reqUrl.includes('/auth/login') || reqUrl.includes('/auth/register');
-    if (status === 401 && !isAuthAttempt && localStorage.getItem('token')) {
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
+    if (status === 401 && !isAuthAttempt && sessionStorage.getItem('token')) {
+      sessionStorage.removeItem('token');
+      sessionStorage.removeItem('user');
       if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
         window.location.assign('/login');
       }
