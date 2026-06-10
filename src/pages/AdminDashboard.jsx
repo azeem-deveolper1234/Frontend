@@ -520,7 +520,7 @@ const AdminDashboard = () => {
 
   const tabs = [
     { id: 'dashboard', label: 'Overview', icon: LayoutDashboard },
-    { id: 'queue', label: 'Queue Manager', icon: Users },
+    ...(isDoctor ? [{ id: 'queue', label: 'Queue Manager', icon: Users }] : []),
     ...(!isDoctor ? [{ id: 'doctors', label: 'Manage Doctors', icon: Stethoscope }] : []),
     ...(isDoctor ? [{ id: 'reports', label: 'Create Report', icon: FileText }] : []),
     ...(!isDoctor ? [{ id: 'payments', label: 'Financial Records', icon: CreditCard }] : []),
@@ -851,15 +851,15 @@ const AdminDashboard = () => {
                     </div>
                     
                     <div className="overflow-x-auto max-h-[620px]">
-                      <table className="w-full text-left text-base whitespace-nowrap min-w-[1120px]">
+                      <table className="w-full text-left text-sm whitespace-nowrap">
                         <thead className="bg-slate-950/60 text-slate-300 font-extrabold uppercase tracking-wider text-xs border-b border-slate-850">
                           <tr>
-                            <th className="px-8 py-4.5">Token Number</th>
-                            <th className="px-8 py-4.5">Patient Profile</th>
-                            <th className="px-8 py-4.5">Assigned Consultant</th>
-                            <th className="px-8 py-4.5">Current Status</th>
-                            <th className="px-8 py-4.5">Priority Pill</th>
-                            <th className="px-8 py-4.5 text-center min-w-[170px]">Actions</th>
+                            <th className="px-4 py-3.5">Token Number</th>
+                            <th className="px-4 py-3.5">Patient Name</th>
+                            <th className="px-4 py-3.5">Assigned Consultant</th>
+                            <th className="px-4 py-3.5">Current Status</th>
+                            <th className="px-4 py-3.5">Priority Pill</th>
+                            {isDoctor && <th className="px-4 py-3.5 text-center min-w-[120px]">Actions</th>}
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-850">
@@ -867,7 +867,7 @@ const AdminDashboard = () => {
                             const dataSource = selectedType === 'Overall' ? overallStats?.allQueueHistory : todayStats?.allQueueToday;
                             if (!dataSource || dataSource.length === 0) return (
                               <tr>
-                                <td colSpan="6" className="px-8 py-12 text-center text-slate-500 italic">
+                                <td colSpan={isDoctor ? 6 : 5} className="px-4 py-8 text-center text-slate-500 italic">
                                   No clinical queue records found.
                                 </td>
                               </tr>
@@ -876,32 +876,32 @@ const AdminDashboard = () => {
                             const sorted = [...filtered].sort((a, b) => (a.tokenNumber || 0) - (b.tokenNumber || 0));
                             if (filtered.length === 0) return (
                               <tr>
-                                <td colSpan="6" className="px-8 py-12 text-center text-slate-400 italic text-sm">
+                                <td colSpan={isDoctor ? 6 : 5} className="px-4 py-8 text-center text-slate-400 italic text-xs">
                                   No records match this selective filter today.
                                 </td>
                               </tr>
                             );
                             return sorted.map((item, idx) => (
                               <tr key={idx} className="hover:bg-slate-900/30 transition-colors">
-                                <td className="px-8 py-4.5 font-black text-indigo-300 text-xl">#{item.tokenNumber}</td>
-                                <td className="px-8 py-4.5">
+                                <td className="px-4 py-3.5 font-black text-indigo-300 text-lg">#{item.tokenNumber}</td>
+                                <td className="px-4 py-3.5">
                                   <div className="flex items-center gap-3">
                                     <div className="w-9 h-9 rounded-xl bg-slate-800 text-slate-200 flex items-center justify-center font-bold text-sm uppercase">
                                       {item.user?.name ? item.user.name.slice(0,2) : 'WI'}
                                     </div>
                                     <div>
-                                      <p className="font-bold text-slate-100 text-[15px]">{item.user?.name || 'Walk-in Patient'}</p>
+                                      <p className="font-bold text-slate-100 text-sm">{item.user?.name || 'Walk-in Patient'}</p>
                                       <p className="text-slate-400 text-xs tracking-wide mt-0.5">{item.user?.email || 'Registered over counter'}</p>
                                     </div>
                                   </div>
                                 </td>
-                                <td className="px-8 py-4.5">
-                                  <p className="font-bold text-slate-200 text-[15px]">
+                                <td className="px-4 py-3.5">
+                                  <p className="font-bold text-slate-200 text-sm">
                                     Dr. {isDoctor ? (user?.name || item.serviceName) : item.serviceName}
                                   </p>
                                   <p className="text-slate-400 text-xs tracking-wide">Specialist</p>
                                 </td>
-                                <td className="px-8 py-4.5">
+                                <td className="px-4 py-3.5">
                                   <span className={`inline-flex items-center px-3.5 py-1.5 rounded-full text-xs font-black uppercase tracking-wider ${
                                     item.status === 'completed' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 
                                     item.status === 'serving' ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 animate-pulse' :
@@ -910,37 +910,39 @@ const AdminDashboard = () => {
                                     {item.status}
                                   </span>
                                 </td>
-                                <td className="px-8 py-4.5">
+                                <td className="px-4 py-3.5">
                                   <span className={`inline-flex items-center px-3.5 py-1.5 rounded-full text-xs font-black uppercase tracking-wider ${
                                     item.priority === 'emergency' ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20 animate-pulse' : 'bg-slate-800 text-slate-400'
                                   }`}>
                                     {item.priority}
                                   </span>
                                 </td>
-                                <td className="px-8 py-4.5 text-center min-w-[170px]">
-                                  {item.status === 'serving' && (
-                                    <button
-                                      onClick={() => handleInlineComplete(item.tokenNumber, item.serviceName, item._id)}
-                                      className="w-24 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-sm font-bold transition shadow-md shadow-emerald-900/20"
-                                    >
-                                      Finish
-                                    </button>
-                                  )}
-                                  {item.status === 'waiting' && (
-                                    <button
-                                      onClick={() => handleInlineCall(item.serviceName, item.tokenNumber, item._id)}
-                                      className="w-24 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-sm font-bold transition shadow-md shadow-indigo-900/20"
-                                    >
-                                      Call
-                                    </button>
-                                  )}
-                                  {item.status === 'completed' && (
-                                    <span className="text-emerald-400 text-sm font-bold">Done</span>
-                                  )}
-                                  {item.status === 'cancelled' && (
-                                    <span className="text-rose-400 text-sm font-bold">Cancelled</span>
-                                  )}
-                                </td>
+                                {isDoctor && (
+                                  <td className="px-4 py-3.5 text-center min-w-[120px]">
+                                    {item.status === 'serving' && (
+                                      <button
+                                        onClick={() => handleInlineComplete(item.tokenNumber, item.serviceName, item._id)}
+                                        className="w-24 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-sm font-bold transition shadow-md shadow-emerald-900/20"
+                                      >
+                                        Finish
+                                      </button>
+                                    )}
+                                    {item.status === 'waiting' && (
+                                      <button
+                                        onClick={() => handleInlineCall(item.serviceName, item.tokenNumber, item._id)}
+                                        className="w-24 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-sm font-bold transition shadow-md shadow-indigo-900/20"
+                                      >
+                                        Call
+                                      </button>
+                                    )}
+                                    {item.status === 'completed' && (
+                                      <span className="text-emerald-400 text-sm font-bold">Done</span>
+                                    )}
+                                    {item.status === 'cancelled' && (
+                                      <span className="text-rose-400 text-sm font-bold">Cancelled</span>
+                                    )}
+                                  </td>
+                                )}
                               </tr>
                             ));
                           })()}
